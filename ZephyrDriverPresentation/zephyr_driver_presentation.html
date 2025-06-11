@@ -1,0 +1,2244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zephyr OS Driver Development</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            overflow: hidden;
+            display: flex;
+        }
+
+        .project-sidebar {
+            width: 300px;
+            height: 100vh;
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 20px;
+            overflow-y: auto;
+            position: fixed;
+            left: 0;
+            top: 0;
+            z-index: 1000;
+            border-right: 2px solid #34495e;
+        }
+
+        .sidebar-title {
+            font-size: 1.2em;
+            color: #3498db;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #3498db;
+        }
+
+        .project-tree {
+            font-family: monospace;
+            font-size: 0.9em;
+            line-height: 1.6;
+        }
+
+        .tree-folder, .tree-file {
+            color: #95a5a6;  /* Set all items to the same color initially */
+            transition: all 0.3s ease;
+        }
+
+        .tree-item {
+            padding: 4px 0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            padding-left: 20px;
+            color: #95a5a6;
+        }
+
+        .tree-submenu {
+            display: none;
+            padding-left: 20px;
+        }
+
+        .tree-submenu.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .tree-folder:before {
+            content: '▶';
+            position: absolute;
+            left: 0;
+            transition: transform 0.3s ease;
+        }
+
+        .tree-folder.expanded:before {
+            transform: rotate(90deg);
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateX(-10px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        .tree-item:before {
+            content: '├──';
+            position: absolute;
+            left: 0;
+            color: #7f8c8d;
+        }
+
+        .tree-item:last-child:before {
+            content: '└──';
+        }
+
+        .tree-folder {
+            font-weight: bold;
+        }
+
+        .tree-item.highlighted {
+            background: #34495e;
+            color: #2ecc71 !important;
+            padding-left: 24px;
+            border-radius: 4px;
+            font-weight: bold !important;
+            font-size: 1.2em !important;
+            transform: scale(1.05);
+            box-shadow: 0 2px 8px rgba(46, 204, 113, 0.3);
+            animation: pulse-highlight 2s infinite;
+        }
+
+        @keyframes pulse-highlight {
+            0% { box-shadow: 0 2px 8px rgba(46, 204, 113, 0.3); }
+            50% { box-shadow: 0 4px 12px rgba(46, 204, 113, 0.5); }
+            100% { box-shadow: 0 2px 8px rgba(46, 204, 113, 0.3); }
+        }
+
+        .main-content {
+            margin-left: 300px;
+            width: calc(100% - 300px);
+        }
+        
+        .presentation-container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .slide {
+            width: 90%;
+            max-width: 1200px;
+            height: 80vh;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            padding: 60px;
+            display: none;
+            overflow-y: auto;
+            position: relative;
+        }
+        
+        .slide.active {
+            display: block;
+            animation: slideIn 0.5s ease-out;
+        }
+        
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .slide h1 {
+            color: #2c3e50;
+            font-size: 2.5em;
+            margin-bottom: 30px;
+            text-align: center;
+            border-bottom: 4px solid #3498db;
+            padding-bottom: 20px;
+        }
+        
+        .slide h2 {
+            color: #34495e;
+            font-size: 2em;
+            margin: 30px 0 20px 0;
+            border-left: 6px solid #e74c3c;
+            padding-left: 20px;
+        }
+        
+        .slide h3 {
+            color: #2980b9;
+            font-size: 1.4em;
+            margin: 20px 0 15px 0;
+        }
+        
+        .slide p, .slide li {
+            font-size: 1.1em;
+            line-height: 1.6;
+            margin-bottom: 15px;
+            text-align: justify;
+        }
+        
+        .code-block {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 20px;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            margin: 20px 0;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+        
+        .architecture-diagram {
+            background: #f8f9fa;
+            border: 2px solid #dee2e6;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        
+        .controls {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.7);
+            padding: 15px 25px;
+            border-radius: 50px;
+            display: flex;
+            gap: 15px;
+        }
+        
+        .btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        
+        .btn:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+        }
+        
+        .slide-counter {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            background: #34495e;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+        
+        .highlight {
+            background: linear-gradient(120deg, #a8edea 0%, #fed6e3 100%);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            border-left: 4px solid #ff6b6b;
+        }
+        
+        .two-column {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin: 20px 0;
+        }
+        
+        .file-tree {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 0.9em;
+            line-height: 1.4;
+        }
+
+        .animation-container {
+            background: linear-gradient(to bottom right, #f8f9fa, #e9ecef);
+            border: 2px solid #dee2e6;
+            border-radius: 15px;
+            padding: 30px;
+            margin: 20px 0;
+            height: 600px;
+            position: relative;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            overflow-y: auto;
+            overflow-x: hidden;
+            scrollbar-width: thin;
+            scrollbar-color: #3498db #f8f9fa;
+        }
+
+        .code-popup {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80%;
+            max-width: 800px;
+            max-height: 80vh;
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            z-index: 1000;
+            overflow-y: auto;
+        }
+
+        .code-popup.active {
+            display: block;
+            animation: popupFade 0.3s ease-out;
+        }
+
+        @keyframes popupFade {
+            from { opacity: 0; transform: translate(-50%, -48%); }
+            to { opacity: 1; transform: translate(-50%, -50%); }
+        }
+
+        .code-popup-close {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: #666;
+            cursor: pointer;
+            padding: 5px;
+            line-height: 1;
+        }
+
+        .code-popup-close:hover {
+            color: #333;
+        }
+
+        .popup-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 999;
+        }
+
+        .popup-overlay.active {
+            display: block;
+        }
+        
+        .animation-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .animation-container::-webkit-scrollbar-track {
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        
+        .animation-container::-webkit-scrollbar-thumb {
+            background-color: #3498db;
+            border-radius: 4px;
+            border: 2px solid #f8f9fa;
+        }
+
+        .build-step {
+            opacity: 0;
+            transform: translateY(20px) scale(0.95);
+            transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            position: absolute;
+            width: 200px;
+            height: auto;
+            min-height: 120px;
+            background: white;
+            border: 2px solid #3498db;
+            border-radius: 12px;
+            padding: 15px;
+            text-align: center;
+            box-shadow: 0 8px 16px rgba(52, 152, 219, 0.15);
+            cursor: pointer;
+            z-index: 1;
+        }
+        
+        .build-step::after {
+            content: '🔍 Click to view code';
+            position: absolute;
+            bottom: 5px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.8em;
+            color: #666;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        .build-step:hover::after {
+            opacity: 1;
+        }
+
+        .build-step:hover {
+            transform: translateY(-5px) scale(1.02);
+            box-shadow: 0 12px 24px rgba(52, 152, 219, 0.25);
+        }
+
+        .build-step.active {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 8px 16px rgba(52, 152, 219, 0.15); }
+            50% { box-shadow: 0 12px 24px rgba(52, 152, 219, 0.3); }
+            100% { box-shadow: 0 8px 16px rgba(52, 152, 219, 0.15); }
+        }
+
+        /* Ensure arrows are visible and properly positioned */
+        .build-arrow {
+            opacity: 0; /* Default hidden */
+            position: absolute;
+            height: 4px;
+            background: linear-gradient(90deg, #3498db, #2ecc71);
+            transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 1; /* Ensure arrows are above other elements */
+        }
+
+        .build-arrow::before {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: inherit;
+            filter: blur(4px);
+            opacity: 0.5;
+        }
+
+        .build-arrow::after {
+            content: '';
+            position: absolute;
+            right: -12px;
+            top: -8px;
+            width: 0;
+            height: 0;
+            border-left: 16px solid #2ecc71;
+            border-top: 8px solid transparent;
+            border-bottom: 8px solid transparent;
+            filter: drop-shadow(0 3px 6px rgba(46, 204, 113, 0.4));
+        }
+
+        .build-arrow.active {
+            opacity: 1; /* Make visible when active */
+            animation: flow 2s infinite linear;
+        }
+
+        @keyframes flow {
+            0% { background-position: 0% 50%; }
+            100% { background-position: 100% 50%; }
+        }
+
+        .layer-box {
+            opacity: 0;
+            transform: translateX(-20px) scale(0.95);
+            transition: all 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+            margin: 15px;
+            padding: 20px;
+            width: 300px;
+            height: 160px;
+            border: 2px solid #3498db;
+            border-radius: 12px;
+            box-shadow: 0 8px 16px rgba(52, 152, 219, 0.15);
+            position: relative;
+            cursor: pointer;
+        }
+        
+        #layer-1 {
+            background: linear-gradient(135deg, #3498db30, #3498db20);
+            border-color: #3498db;
+        }
+        
+        #layer-2 {
+            background: linear-gradient(135deg, #e74c3c30, #e74c3c20);
+            border-color: #e74c3c;
+        }
+        
+        #layer-3 {
+            background: linear-gradient(135deg, #27ae6030, #27ae6020);
+            border-color: #27ae60;
+        }
+        
+        #layer-4 {
+            background: linear-gradient(135deg, #8e44ad30, #8e44ad20);
+            border-color: #8e44ad;
+        }
+        
+        #layer-5 {
+            background: linear-gradient(135deg, #f39c1230, #f39c1220);
+            border-color: #f39c12;
+        }
+
+        .layer-box:hover {
+            transform: translateX(0) scale(1.02);
+            box-shadow: 0 12px 24px rgba(52, 152, 219, 0.25);
+        }
+
+        .layer-box.active {
+            opacity: 1;
+            transform: translateX(0) scale(1);
+            animation: glow 3s infinite;
+        }
+
+        @keyframes glow {
+            0% { box-shadow: 0 8px 16px rgba(52, 152, 219, 0.15); }
+            50% { box-shadow: 0 0 30px rgba(52, 152, 219, 0.4); }
+            100% { box-shadow: 0 8px 16px rgba(52, 152, 219, 0.15); }
+        }
+
+        .interaction-arrow {
+            opacity: 0;
+            transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            position: absolute;
+            width: 3px;
+            background: linear-gradient(180deg, #e74c3c, #f39c12);
+        }
+
+        .interaction-arrow.active {
+            opacity: 1;
+            animation: pulse-vertical 2s infinite;
+        }
+
+        @keyframes pulse-vertical {
+            0% { transform: scaleY(1); }
+            50% { transform: scaleY(1.1); }
+            100% { transform: scaleY(1); }
+        }
+
+        .step-title {
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 8px;
+            font-size: 1.1em;
+        }
+
+        .step-description {
+            font-size: 0.9em;
+            color: #7f8c8d;
+            line-height: 1.4;
+        }
+
+        .animation-controls {
+            text-align: center;
+            margin-top: 30px;
+            padding: 15px;
+            background: rgba(52, 152, 219, 0.1);
+            border-radius: 10px;
+        }
+
+        .step-btn {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 0 8px;
+            font-size: 0.9em;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 6px rgba(52, 152, 219, 0.2);
+        }
+
+        .step-btn:hover {
+            background: #2980b9;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(52, 152, 219, 0.3);
+        }
+
+        .step-btn:active {
+            transform: translateY(1px);
+        }
+
+        .step-btn.disabled {
+            background: #bdc3c7;
+            cursor: not-allowed;
+        }
+
+        .progress-indicator {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+            gap: 8px;
+        }
+
+        .progress-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #bdc3c7;
+            transition: all 0.3s ease;
+        }
+
+        .progress-dot.active {
+            background: #3498db;
+            transform: scale(1.2);
+        }
+
+        .folder-description {
+            display: none;
+            padding: 8px 12px;
+            margin-top: 4px;
+            background: #34495e;
+            border-left: 3px solid #3498db;
+            font-size: 0.85em;
+            color: #ecf0f1;
+            border-radius: 0 4px 4px 0;
+            line-height: 1.4;
+        }
+
+        .tree-folder:hover > .folder-description {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        .block-diagram {
+            display: grid;
+            grid-template-rows: repeat(4, 1fr);
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .diagram-layer {
+            padding: 10px;
+            border-radius: 8px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .diagram-layer .block {
+            font-weight: bold;
+            position: relative;
+            z-index: 2;
+        }
+
+        .diagram-layer .sub-blocks {
+            margin-top: 8px;
+            font-size: 0.9em;
+            color: #ecf0f1;
+            position: relative;
+            z-index: 1;
+        }
+
+        .diagram-layer:before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.1);
+            z-index: 0;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="project-sidebar">
+        <div class="sidebar-title">Zephyr Project Structure</div>
+        <div class="project-tree">
+            <div class="tree-item tree-folder">zephyr/
+                <div class="folder-description">Root directory containing all Zephyr RTOS source code and configuration files</div>
+            </div>
+            <div class="tree-item tree-folder">├── arch/
+                <div class="folder-description">Architecture-specific code (CPU, SoC family implementations)</div>
+            </div>
+            <div class="tree-item tree-folder">├── boards/
+                <div class="folder-description">Board-specific configurations and initialization code</div>
+                <div class="tree-submenu">
+                    <div class="tree-item tree-folder">│   └── arm/
+                        <div class="folder-description">ARM architecture specific board implementations</div>
+                        <div class="tree-submenu">
+                            <div class="tree-item tree-folder">│       └── myboard/
+                                <div class="folder-description">Your custom board support package (BSP) files</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="tree-item tree-folder">├── drivers/
+                <div class="folder-description">Device drivers for various peripherals and hardware</div>
+                <div class="tree-submenu">
+                    <div class="tree-item tree-folder">│   ├── serial/
+                        <div class="folder-description">UART and other serial communication drivers</div>
+                    </div>
+                    <div class="tree-item tree-folder">│   ├── spi/
+                        <div class="folder-description">SPI bus and device drivers</div>
+                    </div>
+                    <div class="tree-item tree-folder">│   └── i2c/
+                        <div class="folder-description">I2C bus and device drivers</div>
+                    </div>
+                </div>
+            </div>
+            <div class="tree-item tree-folder">├── dts/
+                <div class="folder-description">Device Tree Source files and bindings</div>
+                <div class="tree-submenu">
+                    <div class="tree-item tree-folder">│   ├── bindings/
+                        <div class="folder-description">YAML files describing device tree node requirements</div>
+                    </div>
+                    <div class="tree-item tree-folder">│   └── arm/
+                        <div class="folder-description">ARM-specific device tree includes and SoC definitions</div>
+                    </div>
+                </div>
+            </div>
+            <div class="tree-item tree-folder">├── soc/
+                <div class="folder-description">SoC-specific code and configurations</div>
+                <div class="tree-submenu">
+                    <div class="tree-item tree-folder">│   └── arm/
+                        <div class="folder-description">ARM SoC family implementations</div>
+                        <div class="tree-submenu">
+                            <div class="tree-item tree-folder">│       └── myvendor/
+                                <div class="folder-description">Your vendor-specific SoC support files</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="tree-item tree-folder">├── include/
+                <div class="folder-description">Public API header files and system definitions</div>
+                <div class="tree-submenu">
+                    <div class="tree-item tree-folder">│   ├── drivers/
+                        <div class="folder-description">Driver API definitions and interfaces</div>
+                    </div>
+                    <div class="tree-item tree-folder">│   └── zephyr/
+                        <div class="folder-description">Core Zephyr RTOS API headers</div>
+                    </div>
+                </div>
+            </div>
+            <div class="tree-item tree-folder">├── kernel/
+                <div class="folder-description">Core kernel implementation (scheduling, threading, etc.)</div>
+            </div>
+            <div class="tree-item tree-folder">├── subsys/
+                <div class="folder-description">Various subsystems (networking, filesystem, etc.)</div>
+            </div>
+            <div class="tree-item">├── CMakeLists.txt
+                <div class="folder-description">Main build system configuration file</div>
+            </div>
+            <div class="tree-item">└── Kconfig
+                <div class="folder-description">Root configuration options for the entire system</div>
+            </div>
+        </div>
+    </div>
+    <div class="main-content">
+        <div class="presentation-container">
+        <!-- Slide 1: Title -->
+        <div class="slide active">
+            <div class="slide-counter">1 / 20</div>
+            <h1>Zephyr Introduction</h1>
+            
+            <!-- Add Zephyr Block Diagram -->
+            <div class="architecture-diagram">
+                <h3>Zephyr OS Architecture</h3>
+                <div class="block-diagram">
+                    <!-- Top Layer: Applications -->
+                    <div class="diagram-layer" style="background: linear-gradient(135deg, #3498db30, #3498db20);">
+                        <div class="block">Applications</div>
+                        <div class="sub-blocks">
+                            <span>User Applications</span>
+                            <span>Shell</span>
+                            <span>Unit Tests</span>
+                        </div>
+                    </div>
+
+                    <!-- Middle Layer: OS Services -->
+                    <div class="diagram-layer" style="background: linear-gradient(135deg, #e74c3c30, #e74c3c20);">
+                        <div class="block">OS Services</div>
+                        <div class="sub-blocks">
+                            <span>Networking</span>
+                            <span>File Systems</span>
+                            <span>IPC</span>
+                            <span>Power Mgmt</span>
+                        </div>
+                    </div>
+
+                    <!-- Core Layer -->
+                    <div class="diagram-layer" style="background: linear-gradient(135deg, #27ae6030, #27ae6020);">
+                        <div class="block">Kernel Services</div>
+                        <div class="sub-blocks">
+                            <span>Scheduling</span>
+                            <span>Memory Management</span>
+                            <span>Threading</span>
+                            <span>Device Drivers</span>
+                        </div>
+                    </div>
+
+                    <!-- Bottom Layer: Hardware -->
+                    <div class="diagram-layer" style="background: linear-gradient(135deg, #f39c1230, #f39c1220);">
+                        <div class="block">Hardware Layer</div>
+                        <div class="sub-blocks">
+                            <span>Architecture</span>
+                            <span>SoC</span>
+                            <span>Board</span>
+                            <span>Peripherals</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 2: Zephyr OS Overview -->
+        <div class="slide">
+            <div class="slide-counter">2 / 20</div>
+            <h1>Zephyr OS Architecture Overview</h1>
+            <h2>What Makes Zephyr Special</h2>
+            <p>Zephyr OS is a small, scalable real-time operating system specifically designed for resource-constrained embedded devices. Understanding its architecture is crucial before diving into driver development.</p>
+            
+            <div class="architecture-diagram">
+                <h3>Zephyr Software Stack</h3>
+                <div style="font-family: monospace; text-align: left; margin: 20px;">
+Application Layer<br>
+├── Application Code<br>
+├── Zephyr APIs (POSIX, Native)<br>
+└── Services (Networking, Bluetooth, etc.)<br>
+<br>
+Kernel Layer<br>
+├── Scheduler & Threading<br>
+├── Memory Management<br>
+├── Inter-Process Communication<br>
+└── Timer & Interrupt Management<br>
+<br>
+Hardware Abstraction Layer<br>
+├── Device Tree Bindings<br>
+├── Device Drivers<br>
+├── Board Support Package<br>
+└── SoC/Platform Code<br>
+<br>
+Hardware Layer<br>
+└── Your Custom SoC
+                </div>
+            </div>
+            
+            <p>The beauty of Zephyr lies in its device tree-driven approach. Unlike traditional embedded systems where hardware configuration is scattered across multiple files, Zephyr centralizes hardware description in device tree files, making porting more systematic and maintainable.</p>
+        </div>
+
+        <!-- Slide 3: Device Tree Foundation -->
+        <div class="slide">
+            <div class="slide-counter">3 / 20</div>
+            <h1>Device Tree Foundation</h1>
+            <h2>The Heart of Zephyr Hardware Description</h2>
+            <p>Device trees in Zephyr serve as the blueprint for your hardware. They describe every peripheral, its properties, and how different components connect to each other. Think of it as a detailed hardware manual that the software can read and understand.</p>
+            
+            <h3>Key Device Tree Concepts</h3>
+            <p>Every hardware component in your SoC needs to be described in the device tree. This includes not just peripherals like SPI and UART, but also clocks, power domains, pin configurations, and interrupt controllers. The device tree compiler processes these descriptions and generates the necessary data structures for the kernel.</p>
+            
+            <div class="code-block">// Basic device tree structure for a UART peripheral
+uart2: uart@40004800 {
+    compatible = "st,stm32-uart";           // Tells Zephyr which driver to use
+    reg = &lt;0x40004800 0x400&gt;;              // Memory-mapped register address
+    clocks = &lt;&clk_APB1 UART2_CK&gt;;         // Clock configuration
+    interrupts = &lt;38 0&gt;;                   // Interrupt line and priority
+    status = "disabled";                   // Default state
+    pinctrl-0 = &lt;&uart2_default&gt;;          // Pin configuration reference
+    pinctrl-names = "default";
+};</div>
+            
+            <p>The device tree approach provides several advantages: it separates hardware description from software logic, enables the same driver code to work across different SoCs, and allows for easy hardware variant management without code changes.</p>
+        </div>
+
+        <!-- Slide 4: Project Structure -->
+        <div class="slide">
+            <div class="slide-counter">4 / 20</div>
+            <h1>Zephyr Project Structure for New SoC</h1>
+            <h2>Organizing Your Port</h2>
+            <p>When porting Zephyr to a new SoC, understanding the project structure is essential. Zephyr follows a specific organization that separates concerns and makes the codebase maintainable.</p>  
+            <div style="font-family: monospace; text-align: left; margin: 20px;">
+    zephyr/<br>
+    ├── soc/<br>
+    │   └── arm/<br>
+    │       └── your_vendor/<br>
+    │           ├── common/<br>
+    │           └── your_soc/<br>
+    │               ├── soc.c<br>
+    │               ├── soc.h<br>
+    │               ├── Kconfig.soc<br>
+    │               └── dts/<br>
+    │                   ├── your_soc.dtsi<br>
+    │                   └── bindings/<br>
+    ├── boards/<br>
+    │   └── arm/<br>
+    │       └── your_board/<br>
+    │           ├── your_board.dts<br>
+    │           ├── your_board_defconfig<br>
+    │           ├── board.c<br>
+    │           └── pinmux.c<br>
+    ├── drivers/<br>
+    │   ├── serial/<br>
+    │   ├── spi/<br>
+    │   ├── i2c/<br>
+    │   └── your_custom/<br>
+    └── dts/<br>
+        └── bindings/<br>
+        ├── serial/<br>
+        ├── spi/<br>
+        └── your_vendor/<br>
+            </div>
+            
+            <p>This structure ensures that SoC-specific code is properly isolated while allowing for code reuse across similar platforms. The separation between SoC and board directories is particularly important: SoC files describe the chip itself, while board files describe how that chip is used on a specific PCB.</p>
+        </div>
+
+        <!-- Slide 5: STM32F407G Example Structure -->
+        <div class="slide">
+            <div class="slide-counter">5 / 20</div>
+            <h1>STM32F407G Case Study: File Organization</h1>
+            <h2>Learning from an Existing Implementation</h2>
+            <p>Let's examine how STM32F407G is implemented in Zephyr to understand the pattern you'll follow for your own SoC. This real-world example shows how all the pieces fit together.</p>
+            
+            <div class="two-column">
+            <div>
+                <h3>SoC Level Files</h3>
+                <div style="font-family: monospace; text-align: left; margin: 20px;">
+    soc/arm/st_stm32/stm32f4/<br>
+    ├── soc.c<br>
+    ├── soc.h<br>
+    ├── Kconfig.soc<br>
+    └── dts/<br>
+        └── stm32f407.dtsi
+                </div>
+                
+                <h3>Board Level Files</h3>
+                <div style="font-family: monospace; text-align: left; margin: 20px;">
+    boards/arm/stm32f4_disco/<br>
+    ├── stm32f4_disco.dts<br>
+    ├── stm32f4_disco_defconfig<br>
+    ├── board.c<br>
+    └── pinmux.c
+                </div>
+            </div>
+            
+            <div>
+                <h3>Driver Files</h3>
+                <div style="font-family: monospace; text-align: left; margin: 20px;">
+    drivers/serial/<br>
+    └── uart_stm32.c<br>
+    dts/bindings/serial/<br>
+    └── st,stm32-uart.yaml
+                </div>
+                
+                <h3>Key Relationships</h3>
+                <p>The SoC device tree (stm32f407.dtsi) defines all available peripherals. The board device tree inherits from this and enables specific peripherals. The binding files define the properties that each peripheral type supports, while the drivers implement the actual functionality.</p>
+            </div>
+            </div>
+            
+            <p>Notice how this structure promotes reusability: the same UART driver works across all STM32 variants because the device tree abstracts the hardware differences, and the binding files ensure consistent property naming across different implementations.</p>
+        </div>
+
+        <!-- Slide 6: Zephyr's Driver APIs -->
+        <div class="slide">
+            <div class="slide-counter">6 / 20</div>
+            <h1>Zephyr's Driver APIs</h1>
+            <h2>Types of Drivers & Essential Macros</h2>
+            <p>Zephyr supports several types of drivers, each with its own API and integration points. Understanding these is crucial for writing portable and maintainable controller drivers.</p>
+            <h3>Types of Drivers in Zephyr</h3>
+            <ul>
+                <li><strong>SoC/Board Drivers:</strong> Initialization and low-level setup for SoC and board-specific hardware.</li>
+                <li><strong>Controller Drivers:</strong> For on-chip peripherals (UART, SPI, I2C, GPIO, etc.).</li>
+                <li><strong>Sensor/Peripheral Drivers:</strong> For external devices (sensors, displays, etc.).</li>
+                <li><strong>Middleware Drivers:</strong> For software-based interfaces (networking, file systems, etc.).</li>
+            </ul>
+            <h3>Essential Driver Macros & APIs</h3>
+            <div class="code-block">// Must-have macros in every controller driver
+#define DT_DRV_COMPAT your_vendor_uart   // Matches the compatible string in device tree
+
+// Instantiates a device from device tree
+DEVICE_DT_INST_DEFINE(
+    index,                // Instance index
+    init_fn,              // Initialization function
+    pm_control_fn,        // Power management (optional)
+    &data,                // Runtime data
+    &config,              // Static config
+    PRE_KERNEL_1,         // Init level
+    CONFIG_UART_INIT_PRIORITY, // Init priority
+    &api                  // API struct
+);
+
+// Iterates over all enabled device tree instances
+DT_INST_FOREACH_STATUS_OKAY(fn)
+</div>
+            <ul>
+                <li><strong>DT_DRV_COMPAT:</strong> Binds your driver to the device tree compatible string.</li>
+                <li><strong>DEVICE_DT_INST_DEFINE:</strong> Registers the driver instance with the kernel, pulling config from device tree.</li>
+                <li><strong>DT_INST_FOREACH_STATUS_OKAY:</strong> Instantiates the driver for each enabled device tree node.</li>
+            </ul>
+            <div class="highlight">
+                <p><strong>Tip:</strong> These macros are required for every controller driver. They ensure your driver is discoverable, configurable, and portable across boards and SoCs.</p>
+            </div>
+        </div>
+
+        <!-- Slide 7: Device Tree Deep Dive -->
+        <div class="slide">
+            <div class="slide-counter">7 / 20</div>
+            <h1>Device Tree Deep Dive: STM32F407G UART</h1>
+            <h2>Understanding the Complete Hardware Description</h2>
+            <p>Let's dissect how UART is described in the STM32F407G device tree to understand every component you'll need for your own implementation.</p>
+            
+            <div class="code-block">// From stm32f407.dtsi - SoC level description
+soc {
+    // UART peripheral definition
+    usart2: serial@40004400 {
+        compatible = "st,stm32-uart";
+        reg = &lt;0x40004400 0x400&gt;;           // Register base and size
+        clocks = &lt;&rcc STM32_CLOCK_BUS_APB1 0x00020000&gt;;
+        interrupts = &lt;38 0&gt;;               // IRQ number and priority
+        status = "disabled";               // Disabled by default
+        pinctrl-0 = &lt;&usart2_default&gt;;     // Default pin configuration
+        pinctrl-names = "default";
+    };
+};
+
+// Clock configuration - critical for peripheral operation
+&rcc {
+    compatible = "st,stm32f4-rcc";
+    #clock-cells = &lt;2&gt;;
+    reg = &lt;0x40023800 0x400&gt;;
+};
+
+// Pin control configuration
+&pinctrl {
+    usart2_default: usart2_default {
+        group1 {
+            psels = &lt;STM32_PINMUX('A', 2, AF7)&gt;,    // TX pin
+                    &lt;STM32_PINMUX('A', 3, AF7)&gt;;     // RX pin
+            drive-push-pull;
+            bias-disable;
+        };
+    };
+};</div>
+            
+            <div class="highlight">
+                <p><strong>Critical Understanding:</strong> Each property in the device tree has a specific purpose. The 'compatible' string links to the driver, 'reg' defines memory mapping, 'clocks' enables the peripheral, 'interrupts' handles asynchronous events, and 'pinctrl' configures the physical pins.</p>
+            </div>
+        </div>
+
+        <!-- Slide 8: YAML Bindings -->
+        <div class="slide">
+            <div class="slide-counter">8 / 20</div>
+            <h1>YAML Binding Definitions</h1>
+            <h2>Defining the Contract Between Hardware and Software</h2>
+            <p>YAML binding files are the contract that defines what properties a device tree node can have. They serve as both documentation and validation rules for the device tree compiler.</p>
+            
+            <div class="code-block"># dts/bindings/serial/st,stm32-uart.yaml
+description: STM32 UART controller
+
+compatible: "st,stm32-uart"
+
+include: 
+  - name: uart-controller.yaml    # Inherit common UART properties
+  - name: pinctrl-device.yaml     # Include pin control support
+
+properties:
+  reg:
+    required: true
+    description: Register base address and size
+    
+  interrupts:
+    required: true
+    description: Interrupt configuration
+    
+  clocks:
+    required: true  
+    description: Clock configuration for the peripheral
+    
+  pinctrl-0:
+    description: Default pin control configuration
+    
+  pinctrl-names:
+    description: Names for pin control states
+    
+  current-speed:
+    type: int
+    default: 115200
+    description: Initial baud rate for the UART</div>
+            
+            <p>The power of YAML bindings lies in their ability to enforce consistency and provide clear documentation. When you create a binding, you're defining exactly what properties your driver expects and what values are valid. This prevents configuration errors and makes the hardware description self-documenting.</p>
+        </div>
+
+        <!-- Slide 9: Kconfig System -->
+        <div class="slide">
+            <div class="slide-counter">9 / 20</div>
+            <h1>Kconfig Configuration System</h1>
+            <h2>Managing Build-Time Options</h2>
+            <p>Kconfig is Zephyr's configuration system that allows you to enable/disable features and set build-time parameters. For driver development, you'll need to understand how to create configuration options for your new peripherals.</p>
+            
+            <div class="two-column">
+                <div>
+                    <h3>SoC Level Kconfig</h3>
+                    <div class="code-block"># Kconfig.soc
+config SOC_SERIES_YOUR_SOC
+    bool "Your SoC Series"
+    select ARM
+    select CPU_CORTEX_M4
+    select SOC_FAMILY_YOUR_FAMILY
+    
+config SOC_YOUR_SPECIFIC_SOC  
+    bool "Your Specific SoC Model"
+    select SOC_SERIES_YOUR_SOC</div>
+                </div>
+                
+                <div>
+                    <h3>Driver Level Kconfig</h3>
+                    <div class="code-block"># drivers/serial/Kconfig
+config UART_YOUR_VENDOR
+    bool "Your Vendor UART driver"
+    depends on SOC_FAMILY_YOUR_FAMILY
+    select SERIAL_HAS_DRIVER
+    select SERIAL_SUPPORT_INTERRUPT
+    help
+      Enable UART driver for your SoC family.
+      This driver supports all UART peripherals
+      on your SoC series.</div>
+                </div>
+            </div>
+            
+            <h3>Understanding Kconfig Dependencies</h3>
+            <p>Kconfig uses a dependency system to ensure that only valid combinations of options can be selected. When you define a driver configuration, you typically make it depend on the SoC or SoC family, ensuring it's only available when building for compatible hardware. The 'select' statements automatically enable required dependencies, while 'depends on' creates conditional availability.</p>
+            
+            <div class="highlight">
+                <p><strong>Best Practice:</strong> Always provide helpful descriptions in your Kconfig entries. These become the help text that users see when configuring their builds, and good documentation here saves hours of debugging later.</p>
+            </div>
+        </div>
+
+        <!-- Slide 10: Clock and Reset Management -->
+        <div class="slide">
+            <div class="slide-counter">10 / 20</div>
+            <h1>Clock and Reset Management</h1>
+            <h2>The Foundation of Peripheral Operation</h2>
+            <p>Before any peripheral can function, it needs proper clock configuration and reset handling. In Zephyr, this is managed through the clock control subsystem and device tree clock bindings.</p>
+            
+            <h3>Clock Control Implementation</h3>
+            <p>Most SoCs have a central clock control unit that manages peripheral clocks. Your implementation needs to provide a clock control driver that can enable, disable, and configure clocks for various peripherals.</p>
+            
+            <div class="code-block">// Clock control driver structure
+static int your_soc_clock_control_get_rate(const struct device *dev,
+                                          clock_control_subsys_t sub_system,
+                                          uint32_t *rate)
+{
+    // Calculate and return the clock rate for the specified subsystem
+    struct your_clock_config *cfg = (struct your_clock_config *)sub_system;
+    
+    // Your SoC-specific clock calculation logic here
+    *rate = calculate_peripheral_clock_rate(cfg);
+    return 0;
+}
+
+static int your_soc_clock_control_on(const struct device *dev,
+                                    clock_control_subsys_t sub_system)
+{
+    // Enable clock for the specified peripheral
+    struct your_clock_config *cfg = (struct your_clock_config *)sub_system;
+    
+    // Set the appropriate bits in your SoC's clock enable registers
+    enable_peripheral_clock(cfg->clock_id);
+    return 0;
+}
+
+// Clock control driver API structure
+static const struct clock_control_driver_api your_clock_api = {
+    .on = your_soc_clock_control_on,
+    .off = your_soc_clock_control_off,
+    .get_rate = your_soc_clock_control_get_rate,
+};</div>
+            
+            <p>The clock control driver acts as a central service that other drivers use to manage their clock requirements. When a UART driver initializes, it calls the clock control API to enable its clock, ensuring the peripheral receives the correct clock signal before attempting any operations.</p>
+        </div>
+
+        <!-- Slide 11: Interrupt Configuration -->
+        <div class="slide">
+            <div class="slide-counter">11 / 20</div>
+            <h1>Interrupt Configuration and Handling</h1>
+            <h2>Managing Asynchronous Hardware Events</h2>
+            <p>Interrupt handling in Zephyr follows a structured approach that separates interrupt configuration (done in device tree) from interrupt handling (done in driver code). Understanding this separation is crucial for reliable driver operation.</p>
+            
+            <h3>Device Tree Interrupt Configuration</h3>
+            <div class="code-block">// Interrupt controller definition in your SoC device tree
+nvic: interrupt-controller@e000e100 {
+    compatible = "arm,v7m-nvic";
+    reg = &lt;0xe000e100 0xc00&gt;;
+    interrupt-controller;
+    #interrupt-cells = &lt;2&gt;;           // IRQ number and priority
+};
+
+// Peripheral with interrupt configuration  
+uart1: uart@40011000 {
+    compatible = "your-vendor,uart";
+    reg = &lt;0x40011000 0x400&gt;;
+    interrupts = &lt;37 0&gt;;              // IRQ 37, priority 0
+    interrupt-parent = &lt;&nvic&gt;;
+    status = "disabled";
+};</div>
+            
+            <h3>Driver Interrupt Handling</h3>
+            <div class="code-block">// In your UART driver initialization
+static int uart_your_vendor_init(const struct device *dev)
+{
+    struct uart_your_vendor_data *data = dev->data;
+    const struct uart_your_vendor_config *cfg = dev->config;
+    
+    // Configure the UART hardware registers
+    configure_uart_registers(cfg);
+    
+    // Connect the interrupt service routine
+    cfg->irq_config_func(dev);
+    
+    return 0;
+}
+
+// Interrupt service routine
+static void uart_your_vendor_isr(const struct device *dev)
+{
+    struct uart_your_vendor_data *data = dev->data;
+    uint32_t status = read_interrupt_status_register(dev);
+    
+    if (status & UART_RX_INTERRUPT) {
+        // Handle received data
+        handle_rx_interrupt(dev);
+    }
+    
+    if (status & UART_TX_INTERRUPT) {
+        // Handle transmit complete
+        handle_tx_interrupt(dev);
+    }
+    
+    // Clear interrupt flags
+    clear_interrupt_flags(dev, status);
+}</div>
+            
+            <p>The key insight here is that Zephyr automatically connects your interrupt handler based on the device tree configuration. You don't manually register interrupts; instead, you provide an IRQ configuration function that Zephyr calls during initialization.</p>
+        </div>
+
+        <!-- Slide 12: UART Driver Implementation -->
+        <div class="slide">
+            <div class="slide-counter">12 / 20</div>
+            <h1>Complete UART Driver Implementation</h1>
+            <h2>From Device Tree to Working Code</h2>
+            <p>Now let's implement a complete UART driver that demonstrates all the concepts we've discussed. This example shows the structure and key functions you'll need for any peripheral driver.</p>
+            
+            <div class="code-block">// uart_your_vendor.c - Complete driver implementation
+#include &lt;zephyr/kernel.h&gt;
+#include &lt;zephyr/device.h&gt;
+#include &lt;zephyr/drivers/uart.h&gt;
+#include &lt;zephyr/drivers/clock_control.h&gt;
+#include &lt;zephyr/irq.h&gt;
+
+// Hardware register definitions for your UART
+struct uart_your_vendor_regs {
+    volatile uint32_t data;       // Data register
+    volatile uint32_t control;    // Control register  
+    volatile uint32_t status;     // Status register
+    volatile uint32_t baud_div;   // Baud rate divisor
+};
+
+// Driver configuration (from device tree)
+struct uart_your_vendor_config {
+    struct uart_your_vendor_regs *regs;
+    const struct device *clock_dev;
+    clock_control_subsys_t clock_subsys;
+    uint32_t baud_rate;
+    void (*irq_config_func)(const struct device *dev);
+};
+
+// Driver runtime data
+struct uart_your_vendor_data {
+    uart_irq_callback_user_data_t callback;
+    void *user_data;
+    bool tx_active;
+};
+
+// UART API implementation
+static int uart_your_vendor_poll_in(const struct device *dev, unsigned char *c)
+{
+    const struct uart_your_vendor_config *cfg = dev->config;
+    
+    if (!(cfg->regs->status & UART_RX_READY)) {
+        return -1;  // No data available
+    }
+    
+    *c = cfg->regs->data & 0xFF;
+    return 0;
+}
+
+static void uart_your_vendor_poll_out(const struct device *dev, unsigned char c)
+{
+    const struct uart_your_vendor_config *cfg = dev->config;
+    
+    // Wait for transmitter to be ready
+    while (!(cfg->regs->status & UART_TX_READY)) {
+        /* wait */
+    }
+    
+    cfg->regs->data = c;
+}</div>
+            
+            <p>This implementation shows the essential pattern: configuration comes from device tree, runtime state is maintained in driver data structures, and the actual hardware interaction happens through memory-mapped register access.</p>
+        </div>
+
+        <!-- Slide 13: Driver Registration and Device Tree Macros -->
+        <div class="slide">
+            <div class="slide-counter">13 / 20</div>
+            <h1>Driver Registration and Device Tree Integration</h1>
+            <h2>Connecting All the Pieces</h2>
+            <p>The final step in driver implementation is registering your driver with Zephyr and creating the macros that extract configuration from the device tree. This is where the magic happens that turns device tree descriptions into running code.</p>
+            
+            <div class="code-block">// Device tree configuration extraction macros
+#define UART_YOUR_VENDOR_INIT(index)                                        \
+    static void uart_your_vendor_irq_config_##index(const struct device *dev); \
+                                                                            \
+    static const struct uart_your_vendor_config uart_your_vendor_config_##index = { \
+        .regs = (struct uart_your_vendor_regs *)DT_INST_REG_ADDR(index),   \
+        .clock_dev = DEVICE_DT_GET(DT_INST_CLOCKS_CTLR(index)),           \
+        .clock_subsys = (clock_control_subsys_t)DT_INST_CLOCKS_CELL(index, subsys), \
+        .baud_rate = DT_INST_PROP_OR(index, current_speed, 115200),        \
+        .irq_config_func = uart_your_vendor_irq_config_##index,            \
+    };                                                                      \
+                                                                            \
+    static struct uart_your_vendor_data uart_your_vendor_data_##index;     \
+                                                                            \
+    DEVICE_DT_INST_DEFINE(index,                                          \
+                         uart_your_vendor_init,                           \
+                         NULL,                                             \
+                         &uart_your_vendor_data_##index,                  \
+                         &uart_your_vendor_config_##index,                \
+                         PRE_KERNEL_1,                                     \
+                         CONFIG_UART_INIT_PRIORITY,                       \
+                         &uart_your_vendor_api);                          \
+                                                                            \
+    static void uart_your_vendor_irq_config_##index(const struct device *dev) \
+    {                                                                       \
+        IRQ_CONNECT(DT_INST_IRQN(index),                                   \
+                   DT_INST_IRQ(index, priority),                          \
+                   uart_your_vendor_isr,                                   \
+                   DEVICE_DT_INST_GET(index),                             \
+                   0);                                                     \
+        irq_enable(DT_INST_IRQN(index));                                  \
+    }
+
+// Create instances for all UART nodes in device tree
+DT_INST_FOREACH_STATUS_OKAY(UART_YOUR_VENDOR_INIT)</div>
+            
+            <p>This macro system is Zephyr's secret weapon. The DT_INST_FOREACH_STATUS_OKAY macro automatically creates a driver instance for every device tree node that matches your compatible string and has status = "okay". This means one driver implementation can handle multiple UART instances without any code duplication.</p>
+        </div>
+
+        <!-- Slide 14: SPI Driver Implementation -->
+        <div class="slide">
+            <div class="slide-counter">14 / 20</div>
+            <h1>SPI Driver Implementation Example</h1>
+            <h2>Applying the Same Patterns to Different Peripherals</h2>
+            <p>SPI drivers follow the same architectural patterns as UART drivers but implement different APIs. Let's examine how to implement an SPI driver for your custom SoC, focusing on the differences and similarities.</p>
+            
+            <div class="code-block">// SPI driver structure - similar pattern to UART
+struct spi_your_vendor_config {
+    struct spi_your_vendor_regs *regs;
+    const struct device *clock_dev;
+    clock_control_subsys_t clock_subsys;
+    uint32_t max_frequency;
+    void (*irq_config_func)(const struct device *dev);
+};
+
+struct spi_your_vendor_data {
+    struct spi_context ctx;        // Zephyr SPI context
+    uint32_t current_frequency;
+};
+
+// SPI-specific device tree binding
+// dts/bindings/spi/your-vendor,spi.yaml
+description: Your Vendor SPI Controller
+
+compatible: "your-vendor,spi"
+
+include:
+  - name: spi-controller.yaml
+  - name: pinctrl-device.yaml
+
+properties:
+  reg:
+    required: true
+  interrupts:
+    required: true
+  clocks:
+    required: true
+  "#address-cells":
+    const: 1
+  "#size-cells":
+    const: 0</div>
+            
+            <p>The key difference with SPI is the need to handle multiple slave devices on the same bus. Your SPI driver needs to manage chip select signals, different clock speeds for different slaves, and various SPI modes (clock polarity, phase, bit order).</p>
+            
+            <div class="code-block">// SPI API implementation
+static int spi_your_vendor_transceive(const struct device *dev,
+                                     const struct spi_config *config,
+                                     const struct spi_buf_set *tx_bufs,
+                                     const struct spi_buf_set *rx_bufs)
+{
+    struct spi_your_vendor_data *data = dev->data;
+    const struct spi_your_vendor_config *cfg = dev->config;
+    int ret;
+    
+    // Configure SPI parameters for this transaction
+    ret = spi_your_vendor_configure(dev, config);
+    if (ret) {
+        return ret;
+    }
+    
+    // Set up the SPI context for this transaction
+    spi_context_buffers_setup(&data->ctx, tx_bufs, rx_bufs, 1);
+    
+    // Start the transaction
+    ret = spi_your_vendor_start_transaction(dev);
+    if (ret) {
+        return ret;
+    }
+    
+    // Wait for completion
+    ret = spi_context_wait_for_completion(&data->ctx);
+    
+    return ret;
+}</div>
+        </div>
+
+        <!-- Slide 15: Build System Integration -->
+        <div class="slide">
+            <div class="slide-counter">15 / 20</div>
+            <h1>Build System Integration</h1>
+            <h2>How Zephyr Compiles Your Code</h2>
+            <p>Understanding Zephyr's build system is crucial for successful driver integration. Zephyr uses CMake as its build system, but with additional layers that handle device tree processing, Kconfig integration, and code generation.</p>
+            
+            <div class="architecture-diagram">
+                <h3>Zephyr Build Process Flow</h3>
+                <div style="font-family: monospace; text-align: left; margin: 20px;">
+1. Configuration Phase<br>
+   ├── Process Kconfig files → .config<br>
+   ├── Process Device Tree files → devicetree.h<br>
+   └── Generate build configuration<br>
+<br>
+2. Code Generation Phase<br>
+   ├── Generate device tree macros<br>
+   ├── Create device instances<br>
+   └── Generate interrupt vectors<br>
+<br>
+3. Compilation Phase<br>
+   ├── Compile kernel sources<br>
+   ├── Compile driver sources<br>
+   ├── Compile application sources<br>
+   └── Link everything together<br>
+<br>
+4. Post-processing Phase<br>
+   ├── Generate binary formats<br>
+   ├── Calculate checksums<br>
+   └── Create flashable images
+                </div>
+            </div>
+            
+            <h3>Key Build System Files</h3>
+            <div class="two-column">
+                <div>
+                    <h4>CMakeLists.txt Structure</h4>
+                    <div class="code-block"># drivers/serial/CMakeLists.txt
+zephyr_library()
+
+zephyr_library_sources_ifdef(
+  CONFIG_UART_YOUR_VENDOR 
+  uart_your_vendor.c
+)
+
+# Add include directories
+zephyr_library_include_directories(
+  ${ZEPHYR_BASE}/drivers/serial
+)</div>
+                </div>
+                
+                <div>
+                    <h4>Integration Points</h4>
+                    <p>Your driver needs to be integrated at multiple levels: the CMake build system needs to know when to compile your code, the Kconfig system needs to provide configuration options, and the device tree system needs to recognize your bindings.</p>
+                    
+                    <p>The beauty of this system is that once properly configured, adding a new peripheral to your board is as simple as updating the device tree - no code changes required.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Slide 16: Testing and Validation -->
+        <div class="slide">
+            <div class="slide-counter">16 / 20</div>
+            <h1>Testing and Validation Strategy</h1>
+            <h2>Ensuring Your Driver Works Reliably</h2>
+            <p>A well-tested driver is essential for production use. Zephyr provides several testing frameworks and approaches that you should leverage when developing your drivers.</p>
+            
+            <h3>Unit Testing with Ztest</h3>
+            <div class="code-block">// tests/drivers/uart/uart_basic_api/src/test_uart_basic_api.c
+#include &lt;zephyr/ztest.h&gt;
+#include &lt;zephyr/drivers/uart.h&gt;
+
+const struct device *uart_dev = DEVICE_DT_GET(DT_ALIAS(uart0));
+
+ZTEST(uart_basic_api, test_uart_configure)
+{
+    struct uart_config uart_cfg = {
+        .baudrate = 115200,
+        .parity = UART_CFG_PARITY_NONE,
+        .stop_bits = UART_CFG_STOP_BITS_1,
+        .data_bits = UART_CFG_DATA_BITS_8,
+        .flow_ctrl = UART_CFG_FLOW_CTRL_NONE,
+    };
+    
+    int ret = uart_configure(uart_dev, &uart_cfg);
+    zassert_equal(ret, 0, "UART configuration failed");
+}
+
+ZTEST(uart_basic_api, test_uart_poll_in_out)
+{
+    unsigned char tx_data = 'A';
+    unsigned char rx_data;
+    
+    uart_poll_out(uart_dev, tx_data);
+    
+    // In a real test, you'd need loopback or external stimulus
+    // This is a simplified example
+    int ret = uart_poll_in(uart_dev, &rx_data);
+    zassert_equal(ret, 0, "UART poll_in failed");
+    zassert_equal(rx_data, tx_data, "Data mismatch");
+}
+
+ZTEST_SUITE(uart_basic_api, NULL, NULL, NULL, NULL, NULL);</div>
+            
+            <h3>Integration Testing</h3>
+            <p>Beyond unit tests, you need integration tests that verify your driver works with real hardware. Consider creating test applications that exercise all major code paths: normal operation, error conditions, interrupt handling, and power management transitions.</p>
+            
+            <div class="highlight">
+                <p><strong>Testing Checklist:</strong> Verify device initialization, register read/write operations, interrupt handling, error conditions, power management, and performance under load. Don't forget to test edge cases like invalid configurations and resource exhaustion scenarios.</p>
+            </div>
+        </div>
+
+        <!-- Slide 17: Zephyr Driver Build System -->
+        <div class="slide">
+            <div class="slide-counter">17 / 20</div>
+            <h1>Zephyr Driver Build System</h1>
+            <h2>From Source to Binary</h2>
+            
+            <div class="animation-container" id="buildSystem" style="height: 700px;">
+                <div class="build-step" style="left: 50px; top: 50px;" id="build-step-1">
+                    Source Tree
+                </div>
+                
+                <div class="build-step" style="left: 350px; top: 50px;" id="build-step-2">
+                    Device Tree
+                </div>
+                
+                <div class="build-step" style="left: 650px; top: 50px;" id="build-step-3">
+                    Build Config
+                </div>
+                
+                <div class="build-step" style="left: 350px; top: 400px;" id="build-step-4">
+                    Source Build
+                </div>
+                
+                <div class="build-step" style="left: 650px; top: 400px;" id="build-step-5">
+                    Final Output
+                </div>
+                
+                <!-- Arrows -->
+                <div class="build-arrow" style="left: 250px; top: 75px; width: 100px;" id="arrow-1"></div>
+                <div class="build-arrow" style="left: 550px; top: 75px; width: 100px;" id="arrow-2"></div>
+                <div class="build-arrow" style="left: 400px; top: 325px; width: 100px; transform: rotate(90deg);" id="arrow-3"></div>
+                <div class="build-arrow" style="left: 550px; top: 475px; width: 100px;" id="arrow-4"></div>
+            </div>
+            
+            <div class="animation-controls">
+                <button class="step-btn" onclick="nextBuildStep()">Next Step</button>
+                <button class="step-btn" onclick="resetBuildAnimation()">Reset</button>
+            </div>
+        </div>
+
+        <!-- Slide 18: Zephyr Boot Process -->
+        <div class="slide">
+            <div class="slide-counter">18 / 20</div>
+            <h1>Zephyr Boot Process</h1>
+            <h2>Driver Loading Sequence</h2>
+            
+            <div class="animation-container" id="bootProcess" style="height: 700px;">
+                <!-- Boot Stages -->
+                <div class="build-step" style="left: 250px; top: 50px;" id="boot-step-1">
+                    <strong>ROM Boot</strong><br>
+                    Hardware Init
+                </div>
+                
+                <div class="build-step" style="left: 250px; top: 160px;" id="boot-step-2">
+                    <strong>PRE_KERNEL_1</strong><br>
+                    Core Drivers
+                </div>
+                
+                <div class="build-step" style="left: 250px; top: 270px;" id="boot-step-3">
+                    <strong>PRE_KERNEL_2</strong><br>
+                    Device Drivers
+                </div>
+                
+                <div class="build-step" style="left: 250px; top: 380px;" id="boot-step-4">
+                    <strong>POST_KERNEL</strong><br>
+                    Late Init
+                </div>
+                
+                <div class="build-step" style="left: 250px; top: 490px;" id="boot-step-5">
+                    <strong>APPLICATION</strong><br>
+                    App Start
+                </div>
+            </div>
+            
+            <div class="animation-controls">
+                <button class="step-btn" onclick="nextBootStep()">Next Step</button>
+                <button class="step-btn" onclick="resetBootAnimation()">Reset</button>
+            </div>
+        </div>
+
+        <!-- Slide 19: Board Porting Procedure -->
+        <div class="slide">
+            <div class="slide-counter">19 / 20</div>
+            <h1>Adding a New Board to Zephyr OS</h1>
+            <h2>Step-by-Step Board Porting Guide</h2>
+            
+            <p>Adding a new board to Zephyr OS requires a systematic approach, ensuring proper hardware description and driver integration.</p>
+            
+            <h3>Required Files and Directory Structure</h3>
+            <div class="file-tree">
+boards/arm/myboard/<br>
+├── myboard.dts              # Board-specific device tree<br>
+├── myboard_defconfig       # Board configuration file<br>
+├── board.c                 # Board initialization code<br>
+├── board.cmake            # Board build system integration<br>
+└── pinmux.c              # Pin multiplexing setup
+            </div>
+
+            <h3>Board Porting Steps</h3>
+            <ol>
+                <li><strong>Create Board Directory Structure</strong>
+                    <ul>
+                        <li>Create board directory under boards/[arch]/[board_name]/</li>
+                        <li>Copy reference board files as templates</li>
+                    </ul>
+                </li>
+                <li><strong>Device Tree Setup</strong>
+                    <ul>
+                        <li>Create board DTS file (myboard.dts)</li>
+                        <li>Include appropriate SoC dtsi file</li>
+                        <li>Define node status and pin configurations</li>
+                        <li>Configure peripherals and clock settings</li>
+                    </ul>
+                </li>
+                <li><strong>Board Configuration</strong>
+                    <ul>
+                        <li>Create defconfig with board-specific Kconfig symbols</li>
+                        <li>Configure CPU, SoC family, and peripherals</li>
+                        <li>Set board-specific hardware options</li>
+                    </ul>
+                </li>
+                <li><strong>Board Initialization</strong>
+                    <ul>
+                        <li>Implement board.c for hardware initialization</li>
+                        <li>Configure pin multiplexing in pinmux.c</li>
+                        <li>Set up early hardware initialization</li>
+                    </ul>
+                </li>
+                <li><strong>Driver Integration</strong>
+                    <ul>
+                        <li>Create or modify SoC-specific drivers</li>
+                        <li>Ensure driver compatibility with board hardware</li>
+                        <li>Test peripheral functionality</li>
+                    </ul>
+                </li>
+            </ol>
+
+            <div class="highlight">
+                <p><strong>Best Practices:</strong>
+                <ul>
+                    <li>Start with a similar reference board as template</li>
+                    <li>Test each peripheral after configuration</li>
+                    <li>Document board-specific requirements and limitations</li>
+                    <li>Follow Zephyr's coding and documentation standards</li>
+                </ul>
+                </p>
+            </div>
+        </div>
+
+        <!-- Slide 20: Hardware Interaction Layers -->
+        <div class="slide">
+            <div class="slide-counter">20 / 20</div>
+            <h1>Zephyr Hardware Interaction Layers</h1>
+            <h2>Understanding the Abstraction Levels</h2>
+            
+            <div class="animation-container" id="layerInteraction" style="height: 700px;">
+                <!-- Layer Boxes -->
+                <div class="layer-box" style="left: 50px; top: 50px;" id="layer-1">
+                    Application Layer
+                </div>
+                
+                <div class="layer-box" style="left: 350px; top: 50px;" id="layer-2">
+                    Kernel Service Layer
+                </div>
+                
+                <div class="layer-box" style="left: 650px; top: 50px;" id="layer-3">
+                    Driver API Layer
+                </div>
+                
+                <div class="layer-box" style="left: 350px; top: 400px;" id="layer-4">
+                    HAL Layer
+                </div>
+                
+                <div class="layer-box" style="left: 650px; top: 400px;" id="layer-5">
+                    Hardware Layer
+                </div>
+            </div>
+            
+            <div class="animation-controls">
+                <button class="step-btn" onclick="nextLayerStep()">Next Step</button>
+                <button class="step-btn" onclick="resetLayerAnimation()">Reset</button>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="controls">
+        <button class="btn" onclick="previousSlide()">◀ Previous</button>
+        <button class="btn" onclick="nextSlide()">Next ▶</button>
+        <button class="btn" onclick="toggleFullscreen()">Fullscreen</button>
+    </div>
+
+    <!-- Code Popup Modal -->
+    <div class="popup-overlay" id="codePopupOverlay"></div>
+    <div class="code-popup" id="codePopup">
+        <button class="code-popup-close" onclick="closeCodePopup()">&times;</button>
+        <pre class="code-block" id="codePopupContent"></pre>
+    </div>
+
+    <script>
+        // Global variables for slide navigation
+        let currentSlide = 0;
+        let slides = [];
+        let totalSlides = 0;
+        
+        // Initialize presentation when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize folder click handlers
+            document.querySelectorAll('.tree-folder').forEach(folder => {
+                folder.addEventListener('click', function(e) {
+                    e.stopPropagation();  // Prevent event bubbling
+                    this.classList.toggle('expanded');
+                    const submenu = this.nextElementSibling;
+                    if (submenu && submenu.classList.contains('tree-submenu')) {
+                        submenu.classList.toggle('active');
+                    }
+                });
+            });
+            
+            // Initialize slide navigation
+            slides = document.querySelectorAll('.slide');
+            totalSlides = slides.length;
+            
+            // Show the first slide
+            showSlide(currentSlide);
+            
+            // Initialize animations
+            initializeBuildSteps();
+            resetBuildAnimation();
+            initializeBootSteps();
+            resetBootAnimation();
+            resetLayerAnimation();
+        });
+        
+        // Slide navigation functions
+        function showSlide(index) {
+            slides.forEach(slide => slide.classList.remove('active'));
+            slides[index].classList.add('active');
+        }
+        
+        function nextSlide() {
+            currentSlide = (currentSlide + 1) % totalSlides;
+            showSlide(currentSlide);
+        }
+        
+        function previousSlide() {
+            currentSlide = (currentSlide - 1 + totalSlides) % totalSlides;
+            showSlide(currentSlide);
+        }
+        
+        function toggleFullscreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                document.exitFullscreen();
+            }
+        }
+        
+        // Keyboard navigation
+        document.addEventListener('keydown', function(e) {
+            switch(e.key) {
+                case 'ArrowRight':
+                case ' ':
+                    nextSlide();
+                    break;
+                case 'ArrowLeft':
+                    previousSlide();
+                    break;
+                case 'f':
+                case 'F':
+                    toggleFullscreen();
+                    break;
+                case 'Escape':
+                    if (document.fullscreenElement) {
+                        document.exitFullscreen();
+                    }
+                    break;
+            }
+        });
+        
+        // Touch/swipe support for mobile
+        let touchStartX = 0;
+        let touchEndX = 0;
+        
+        document.addEventListener('touchstart', function(e) {
+            touchStartX = e.changedTouches[0].screenX;
+        });
+        
+        document.addEventListener('touchend', function(e) {
+            touchEndX = e.changedTouches[0].screenX;
+            handleSwipe();
+        });
+        
+        function handleSwipe() {
+            if (touchEndX < touchStartX - 50) {
+                nextSlide();
+            }
+            if (touchEndX > touchStartX + 50) {
+                previousSlide();
+            }
+        }
+        
+        // --- Build System Animation ---
+        let buildStep = 0;
+        const buildSteps = [
+            {
+                id: 'build-step-1',
+                title: 'Source Tree',
+                info: `<strong>Source Tree Analysis</strong><br>
+                <span style='color:#2980b9'>1. Hardware files (dts/)</span><br>
+                <span style='color:#2980b9'>2. Build config (Kconfig)</span><br>
+                <span style='color:#2980b9'>3. Build rules (CMake)</span><br>
+                <span style='color:#2980b9'>4. Driver source</span><br>
+                <span style='font-size:0.9em;color:#888'>Files located and analyzed</span>`
+            },
+            {
+                id: 'build-step-2',
+                title: 'Device Tree',
+                info: `<strong>DTS Processing</strong><br>
+                <span style='color:#16a085'>1. DTS includes resolved</span><br>
+                <span style='color:#16a085'>2. Overlays applied</span><br>
+                <span style='color:#16a085'>3. Macros generated</span><br>
+                <span style='color:#16a085'>4. Hardware validated</span><br>
+                <span style='font-size:0.9em;color:#888'>Hardware description ready</span>`
+            },
+            {
+                id: 'build-step-3',
+                title: 'Build Config',
+                info: `<strong>Kconfig Processing</strong><br>
+                <span style='color:#e67e22'>1. Options resolved</span><br>
+                <span style='color:#e67e22'>2. Dependencies checked</span><br>
+                <span style='color:#e67e22'>3. Features enabled</span><br>
+                <span style='color:#e67e22'>4. Headers generated</span><br>
+                <span style='font-size:0.9em;color:#888'>Build configuration set</span>`
+            },
+            {
+                id: 'build-step-4',
+                title: 'Source Build',
+                info: `<strong>Source Compilation</strong><br>
+                <span style='color:#8e44ad'>1. Source files compiled</span><br>
+                <span style='color:#8e44ad'>2. DT macros included</span><br>
+                <span style='color:#8e44ad'>3. Config applied</span><br>
+                <span style='color:#8e44ad'>4. Objects created</span><br>
+                <span style='font-size:0.9em;color:#888'>Binary objects ready</span>`
+            },
+            {
+                id: 'build-step-5',
+                title: 'Final Output',
+                info: `<strong>Link & Finalize</strong><br>
+                <span style='color:#27ae60'>1. Objects linked</span><br>
+                <span style='color:#27ae60'>2. Sections arranged</span><br>
+                <span style='color:#27ae60'>3. Image created</span><br>
+                <span style='color:#27ae60'>4. Ready to flash</span><br>
+                <span style='font-size:0.9em;color:#888'>Final binary prepared</span>`
+            }
+        ];
+        const buildArrows = ['arrow-1','arrow-2','arrow-3','arrow-4'];
+        
+        function initializeBuildSteps() {
+            // Initialize all build steps with their initial content
+            buildSteps.forEach((step, index) => {
+                const stepElement = document.getElementById(step.id);
+                if (stepElement) {
+                    stepElement.innerHTML = `<strong>${step.title}</strong>`;
+                    stepElement.style.opacity = '0';
+                    stepElement.style.transform = 'translateY(20px) scale(0.95)';
+                }
+            });
+
+            // Initialize arrows
+            buildArrows.forEach(arrowId => {
+                const arrow = document.getElementById(arrowId);
+                if (arrow) {
+                    arrow.style.opacity = '0';
+                }
+            });
+
+            // Force a reflow to ensure animations work
+            document.getElementById('buildSystem').offsetHeight;
+        }
+
+        function nextBuildStep() {
+            if (buildStep < buildSteps.length) {
+                const currentStep = buildSteps[buildStep];
+                const stepElement = document.getElementById(currentStep.id);
+                
+                if (stepElement) {
+                    // Make sure the step is visible and active
+                    stepElement.style.opacity = '1';
+                    stepElement.style.transform = 'translateY(0) scale(1)';
+                    stepElement.classList.add('active');
+                    stepElement.innerHTML = currentStep.info;
+                    
+                    // Handle arrows
+                    if (buildStep > 0) {
+                        const arrowId = buildArrows[buildStep-1];
+                        const arrow = document.getElementById(arrowId);
+                        if (arrow) {
+                            arrow.style.opacity = '1';
+                            arrow.classList.add('active');
+                        }
+                    }
+                }
+                buildStep++;
+            }
+        }
+
+        function resetBuildAnimation() {
+            buildStep = 0;
+            
+            // Reset all steps with clean up
+            buildSteps.forEach(step => {
+                const element = document.getElementById(step.id);
+                if (element) {
+                    // Remove classes and restore initial state
+                    element.classList.remove('active');
+                    element.style.opacity = '0';
+                    element.style.transform = 'translateY(20px) scale(0.95)';
+                    element.innerHTML = `<strong>${step.title}</strong>`;
+                }
+            });
+            
+            // Reset all arrows with clean up
+            buildArrows.forEach(arrowId => {
+                const arrow = document.getElementById(arrowId);
+                if (arrow) {
+                    arrow.classList.remove('active');
+                    arrow.style.opacity = '0';
+                }
+            });
+
+            // Force a reflow to ensure clean animation state
+            document.getElementById('buildSystem').offsetHeight;
+        }
+
+        // --- Boot Process Animation ---
+        let bootStep = 0;
+        const bootSteps = [
+            {
+                id: 'boot-step-1',
+                info: `<strong>ROM Boot Stage</strong><br>
+                <span style='color:#2980b9'>1. CPU reset vector hit</span><br>
+                <span style='color:#2980b9'>2. Stack initialized</span><br>
+                <span style='color:#2980b9'>3. Vector table set up</span><br>
+                <span style='font-size:0.9em;color:#888'>Hardware in default state</span>`
+            },
+            {
+                id: 'boot-step-2',
+                info: `<strong>PRE_KERNEL_1 Stage</strong><br>
+                <span style='color:#16a085'>1. SoC init starts</span><br>
+                <span style='color:#16a085'>2. Clock tree configured</span><br>
+                <span style='color:#16a085'>3. Memory controller up</span><br>
+                <span style='font-size:0.9em;color:#888'>Basic hardware ready</span>`
+            },
+            {
+                id: 'boot-step-3',
+                info: `<strong>PRE_KERNEL_2 Stage</strong><br>
+                <span style='color:#e67e22'>1. Device instances created</span><br>
+                <span style='color:#e67e22'>2. Drivers initialized</span><br>
+                <span style='color:#e67e22'>3. Resources allocated</span><br>
+                <span style='font-size:0.9em;color:#888'>Driver core services ready</span>`
+            },
+            {
+                id: 'boot-step-4',
+                info: `<strong>POST_KERNEL Stage</strong><br>
+                <span style='color:#8e44ad'>1. Interrupts enabled</span><br>
+                <span style='color:#8e44ad'>2. Threads created</span><br>
+                <span style='color:#8e44ad'>3. Kernel services ready</span><br>
+                <span style='font-size:0.9em;color:#888'>System fully operational</span>`
+            },
+            {
+                id: 'boot-step-5',
+                info: `<strong>APPLICATION Stage</strong><br>
+                <span style='color:#27ae60'>1. User init starts</span><br>
+                <span style='color:#27ae60'>2. App threads launch</span><br>
+                <span style='color:#27ae60'>3. Scheduler running</span><br>
+                <span style='font-size:0.9em;color:#888'>Application takes control</span>`
+            }
+        ];
+        
+        function initializeBootSteps() {
+            // Initialize all boot steps with their initial content
+            bootSteps.forEach((step, index) => {
+                const stepElement = document.getElementById(step.id);
+                if (stepElement) {
+                    stepElement.innerHTML = `<strong>${step.id.replace('boot-step-', 'Step ')}</strong>`;
+                    stepElement.style.opacity = '0';
+                    stepElement.style.transform = 'translateY(20px) scale(0.95)';
+                }
+            });
+        }
+
+        function nextBootStep() {
+            if (bootStep < bootSteps.length) {
+                const currentStep = bootSteps[bootStep];
+                const stepElement = document.getElementById(currentStep.id);
+                
+                if (stepElement) {
+                    // Make sure the step is visible and active
+                    stepElement.style.opacity = '1';
+                    stepElement.style.transform = 'translateY(0) scale(1)';
+                    stepElement.classList.add('active');
+                    stepElement.innerHTML = currentStep.info;
+                }
+                bootStep++;
+            }
+        }
+        
+        function resetBootAnimation() {
+            bootStep = 0;
+            bootSteps.forEach(s => {
+                const element = document.getElementById(s.id);
+                if (element) {
+                    element.classList.remove('active');
+                    element.style.opacity = '0';
+                    element.style.transform = 'translateY(20px) scale(0.95)';
+                    element.innerHTML = `<strong>${s.id.replace('boot-step-', 'Step ')}</strong>`;
+                }
+            });
+            // Force a reflow to ensure clean animation state
+            document.getElementById('bootProcess').offsetHeight;
+        }
+
+        // --- Layer Interaction Animation ---
+        let layerStep = 0;
+        const layerBoxes = [
+            { id: 'layer-1', info: `<strong>Application Layer</strong><br>
+                <span style='color:#3498db'>1. app_main() entry</span><br>
+                <span style='color:#3498db'>2. DEVICE_DT_GET()</span><br>
+                <span style='color:#3498db'>3. API function calls</span><br>
+                <span style='font-size:0.9em;color:#888'>User code initiates operations</span>` },
+            { id: 'layer-2', info: `<strong>Kernel Service Layer</strong><br>
+                <span style='color:#e74c3c'>1. Device validation</span><br>
+                <span style='color:#e74c3c'>2. Permission checks</span><br>
+                <span style='color:#e74c3c'>3. Context switching</span><br>
+                <span style='font-size:0.9em;color:#888'>Kernel manages access & scheduling</span>` },
+            { id: 'layer-3', info: `<strong>Driver API Layer</strong><br>
+                <span style='color:#27ae60'>1. API call translation</span><br>
+                <span style='color:#27ae60'>2. Buffer management</span><br>
+                <span style='color:#27ae60'>3. Error handling</span><br>
+                <span style='font-size:0.9em;color:#888'>Driver implements standard interface</span>` },
+            { id: 'layer-4', info: `<strong>HAL Layer</strong><br>
+                <span style='color:#8e44ad'>1. Register mapping</span><br>
+                <span style='color:#8e44ad'>2. Clock configuration</span><br>
+                <span style='color:#8e44ad'>3. Pin control settings</span><br>
+                <span style='font-size:0.9em;color:#888'>Direct hardware configuration</span>` },
+            { id: 'layer-5', info: `<strong>Hardware Layer</strong><br>
+                <span style='color:#f39c12'>1. Physical interface</span><br>
+                <span style='color:#f39c12'>2. Signal processing</span><br>
+                <span style='color:#f39c12'>3. Hardware events</span><br>
+                <span style='font-size:0.9em;color:#888'>Physical peripheral operation</span>` }
+        ];
+        
+        function nextLayerStep() {
+            if (layerStep < layerBoxes.length) {
+                document.getElementById(layerBoxes[layerStep].id).classList.add('active');
+                document.getElementById(layerBoxes[layerStep].id).innerHTML = layerBoxes[layerStep].info;
+                layerStep++;
+            }
+        }
+        
+        function resetLayerAnimation() {
+            layerStep = 0;
+            layerBoxes.forEach(b => {
+                document.getElementById(b.id).classList.remove('active');
+                document.getElementById(b.id).innerHTML = `<strong>${document.getElementById(b.id).textContent.split('\n')[0]}</strong>`;
+            });
+        }
+
+        // --- Code Popup Data ---
+        const buildStepCode = [
+            // Step 1: Source Tree (CMakeLists.txt)
+            `# drivers/serial/CMakeLists.txt\nzephyr_library()\n\nzephyr_library_sources_ifdef(\n  CONFIG_UART_STM32\n  uart_stm32.c\n)\n\nzephyr_library_include_directories(\n  ${ZEPHYR_BASE}/drivers/serial\n)`,
+            // Step 2: Device Tree (dts/arm/st/stm32f4/stm32f407.dtsi)
+            `// dts/arm/st/stm32f4/stm32f407.dtsi\nusart2: serial@40004400 {\n    compatible = "st,stm32-uart";\n    reg = <0x40004400 0x400>;\n    clocks = <&rcc STM32_CLOCK_BUS_APB1 0x00020000>;\n    interrupts = <38 0>;\n    status = "disabled";\n    pinctrl-0 = <&usart2_default>;\n    pinctrl-names = "default";\n};`,
+            // Step 3: Build Config (drivers/serial/Kconfig)
+            `# drivers/serial/Kconfig\nconfig UART_STM32\n    bool "STM32 UART driver"\n    depends on SOC_FAMILY_STM32\n    select SERIAL_HAS_DRIVER\n    select SERIAL_SUPPORT_INTERRUPT\n    help\n      Enable UART driver for STM32 family.`,
+            // Step 4: Source Build (drivers/serial/uart_stm32.c)
+            `// drivers/serial/uart_stm32.c\n#include <zephyr/kernel.h>\n#include <zephyr/device.h>\n#include <zephyr/drivers/uart.h>\n#include <zephyr/drivers/clock_control.h>\n#include <zephyr/irq.h>\n\nstatic int uart_stm32_init(const struct device *dev) {\n    // ... hardware register setup ...\n    return 0;\n}\n\nstatic const struct uart_driver_api uart_stm32_driver_api = {\n    .poll_in = uart_stm32_poll_in,\n    .poll_out = uart_stm32_poll_out,\n    // ...\n};\n\nDEVICE_DT_INST_DEFINE(0, uart_stm32_init, NULL, &data, &config,\n                      PRE_KERNEL_1, CONFIG_UART_INIT_PRIORITY,\n                      &uart_stm32_driver_api);`,
+            // Step 5: Final Output (zephyr/linker.ld)
+            `/* zephyr/linker.ld */\nSECTIONS\n{\n    .text : {\n        *(.text)\n    }\n    .data : {\n        *(.data)\n    }\n    .bss : {\n        *(.bss)\n    }\n    /* ... */\n}`
+        ];
+        const buildStepSidebarMap = [
+            // ...existing code for buildStepSidebarMap...
+        ];
+
+        // Real Zephyr code for boot steps (slide 18)
+        const bootStepCode = [
+            // ROM Boot: startup assembly (arch/arm/core/aarch32/reset.S)
+            `// arch/arm/core/aarch32/reset.S\n\nSECTION_SUBSEC_FUNC(TEXT, _reset, __reset);\n\tldr   r0, =_vector_table\n\tldr   r1, =_vector_table\n\tldr   r2, =_vector_table\n\t// ... CPU reset, stack pointer setup ...`,
+            // PRE_KERNEL_1: SoC init (soc/arm/st_stm32/stm32f4/soc.c)
+            `// soc/arm/st_stm32/stm32f4/soc.c\n\nvoid stm32f4_soc_init(void) {\n    /* Configure system clocks */\n    stm32_clock_init();\n    /* ... memory controller, early hardware ... */\n}`,
+            // PRE_KERNEL_2: Device/driver instantiation (drivers/serial/uart_stm32.c)
+            `// drivers/serial/uart_stm32.c\n\nDEVICE_DT_INST_DEFINE(0, uart_stm32_init, NULL, &data, &config,\n                      PRE_KERNEL_1, CONFIG_UART_INIT_PRIORITY,\n                      &uart_stm32_driver_api);`,
+            // POST_KERNEL: Kernel threads and interrupts (kernel/init.c)
+            `// kernel/init.c\n\nvoid z_cstart(void) {\n    z_setup_threads();\n    z_enable_interrupts();\n    // ... kernel services ready ...\n}`,
+            // APPLICATION: User main (app/main.c)
+            `// app/main.c\n\nvoid main(void) {\n    printk("Hello, Zephyr!\n");\n    // ... application code ...\n}`
+        ];
+        const bootStepSidebarMap = [
+            // ROM Boot: arch/arm/core/aarch32/reset.S
+            '.tree-item.tree-folder:contains("arch/")',
+            // PRE_KERNEL_1: soc/arm/st_stm32/stm32f4/soc.c
+            '.tree-item.tree-folder:contains("soc/")',
+            // PRE_KERNEL_2: drivers/serial/uart_stm32.c
+            '.tree-item.tree-folder:contains("serial/")',
+            // POST_KERNEL: kernel/init.c
+            '.tree-item.tree-folder:contains("kernel/")',
+            // APPLICATION: app/main.c (simulate as root, highlight zephyr/)
+            '.tree-item.tree-folder:contains("zephyr/")'
+        ];
+
+        // Real Zephyr code for layer boxes (slide 20)
+        const layerBoxCode = [
+            // Application Layer: app/main.c
+            `// app/main.c\n#include <zephyr/kernel.h>\n#include <zephyr/device.h>\n\nvoid main(void) {\n    const struct device *uart_dev = DEVICE_DT_GET(DT_NODELABEL(usart2));\n    uart_poll_out(uart_dev, 'A');\n}`,
+            // Kernel Service Layer: kernel/sched.c
+            `// kernel/sched.c\n\nvoid z_sched_start(void) {\n    // ... context switching, thread management ...\n}`,
+            // Driver API Layer: include/zephyr/drivers/uart.h
+            `// include/zephyr/drivers/uart.h\n\nint uart_poll_in(const struct device *dev, unsigned char *c);\nvoid uart_poll_out(const struct device *dev, unsigned char c);`,
+            // HAL Layer: drivers/serial/uart_stm32.c
+            `// drivers/serial/uart_stm32.c\n\nstatic int uart_stm32_init(const struct device *dev) {\n    // Register mapping, clock config, pin control\n    // ...\n    return 0;\n}`,
+            // Hardware Layer: (simulate as SoC register definition)
+            `// soc/arm/st_stm32/stm32f4/soc.h\n\n#define STM32_USART2_BASE 0x40004400U\n#define STM32_USART2 ((USART_TypeDef *) STM32_USART2_BASE)\n// ... hardware register access ...`
+        ];
+        const layerBoxSidebarMap = [
+            // Application Layer: app/main.c (simulate as root, highlight zephyr/)
+            '.tree-item.tree-folder:contains("zephyr/")',
+            // Kernel Service Layer: kernel/sched.c
+            '.tree-item.tree-folder:contains("kernel/")',
+            // Driver API Layer: include/zephyr/drivers/uart.h
+            '.tree-item.tree-folder:contains("drivers/")',
+            // HAL Layer: drivers/serial/uart_stm32.c
+            '.tree-item.tree-folder:contains("serial/")',
+            // Hardware Layer: soc/arm/st_stm32/stm32f4/soc.h
+            '.tree-item.tree-folder:contains("soc/")'
+        ];
+
+        // --- Code Popup Logic ---
+        function highlightSidebar(selector) {
+            // Remove previous highlights
+            document.querySelectorAll('.project-sidebar .tree-item').forEach(el => {
+                el.classList.remove('highlighted');
+            });
+            // Highlight the relevant file/folder
+            if (selector) {
+                let el = Array.from(document.querySelectorAll('.project-sidebar .tree-item, .project-sidebar .tree-folder'))
+                    .find(e => e.textContent.trim().includes(selector.replace(/.*contains\("(.*)"\).*/, '$1')));
+                if (el) el.classList.add('highlighted');
+            }
+        }
+        function showCodePopup(code, sidebarSelector) {
+            document.getElementById('codePopupContent').textContent = code;
+            document.getElementById('codePopup').classList.add('active');
+            document.getElementById('codePopupOverlay').classList.add('active');
+            highlightSidebar(sidebarSelector);
+        }
+        function closeCodePopup() {
+            document.getElementById('codePopup').classList.remove('active');
+            document.getElementById('codePopupOverlay').classList.remove('active');
+            document.querySelectorAll('.project-sidebar .tree-item').forEach(el => {
+                el.classList.remove('highlighted');
+            });
+        }
+        document.getElementById('codePopupOverlay').onclick = closeCodePopup;
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize folder click handlers
+            document.querySelectorAll('.tree-folder').forEach(folder => {
+                folder.addEventListener('click', function(e) {
+                    e.stopPropagation();  // Prevent event bubbling
+                    this.classList.toggle('expanded');
+                    const submenu = this.nextElementSibling;
+                    if (submenu && submenu.classList.contains('tree-submenu')) {
+                        submenu.classList.toggle('active');
+                    }
+                });
+            });
+            // Build steps (slide 17)
+            buildSteps.forEach((step, idx) => {
+                const el = document.getElementById(step.id);
+                if (el) {
+                    el.onclick = function(e) {
+                        e.stopPropagation();
+                        if (buildStepCode[idx]) showCodePopup(buildStepCode[idx], buildStepSidebarMap[idx]);
+                    };
+                }
+            });
+            // Boot steps (slide 18)
+            bootSteps.forEach((step, idx) => {
+                const el = document.getElementById(step.id);
+                if (el) {
+                    el.onclick = function(e) {
+                        e.stopPropagation();
+                        if (bootStepCode[idx]) showCodePopup(bootStepCode[idx], bootStepSidebarMap[idx]);
+                    };
+                }
+            });
+            // Layer boxes (slide 20)
+            layerBoxes.forEach((box, idx) => {
+                const el = document.getElementById(box.id);
+                if (el) {
+                    el.onclick = function(e) {
+                        e.stopPropagation();
+                        if (layerBoxCode[idx]) showCodePopup(layerBoxCode[idx], layerBoxSidebarMap[idx]);
+                    };
+                }
+            });
+        });
+    </script>
+</body>
+</html>
