@@ -1,0 +1,1528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Signals & Fourier Analysis Interactive Tool</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.18.2/plotly.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.11.0/math.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        
+        .header h1 {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+        
+        .tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 30px;
+            justify-content: center;
+        }
+        
+        .tab-button {
+            background: rgba(255, 255, 255, 0.9);
+            border: none;
+            padding: 15px 25px;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .tab-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+        }
+        
+        .tab-button.active {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            transform: translateY(-2px);
+        }
+        
+        .tab-content {
+            display: none;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .control-panel {
+            background: rgba(248, 250, 252, 0.8);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 25px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+        
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .control-group label {
+            font-weight: 600;
+            color: #4a5568;
+            font-size: 0.9em;
+        }
+        
+        input, select, button {
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+        
+        input:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        button {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        .plot-container {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+        
+        .formula-section {
+            background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+            border-radius: 15px;
+            padding: 25px;
+            margin: 20px 0;
+            border-left: 5px solid #667eea;
+        }
+        
+        .formula-section h3 {
+            color: #2d3748;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+        
+        .formula {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            border-left: 3px solid #764ba2;
+        }
+        
+        .signal-builder {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        .coefficient-display {
+            background: #f8fafc;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 15px 0;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .coefficient-item {
+            background: white;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .properties-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        .property-card {
+            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+            border: 1px solid #e2e8f0;
+        }
+        
+        .property-card h4 {
+            color: #2d3748;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+        
+        @media (max-width: 768px) {
+            .signal-builder {
+                grid-template-columns: 1fr;
+            }
+            
+            .control-panel {
+                grid-template-columns: 1fr;
+            }
+            
+            .tabs {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Interactive Signals & Fourier Analysis Tool</h1>
+            <p>Comprehensive visualization tool for Linear Systems and Signals (B.P. Lathi)</p>
+        </div>
+        
+        <div class="tabs">
+            <button class="tab-button active" onclick="showTab('signals')">Basic Signals</button>
+            <button class="tab-button" onclick="showTab('operations')">Signal Operations</button>
+            <button class="tab-button" onclick="showTab('fourier-series')">Fourier Series</button>
+            <button class="tab-button" onclick="showTab('fourier-transform')">Fourier Transform</button>
+            <button class="tab-button" onclick="showTab('properties')">Properties</button>
+            <button class="tab-button" onclick="showTab('formulas')">Formula Reference</button>
+            <button class="tab-button" onclick="showTab('reconstruction-game')">Reconstruction Game</button>
+            <button class="tab-button" onclick="showTab('evenodd-game')">Even/Odd & Harmonics Game</button>
+        </div>
+        
+        <!-- Basic Signals Tab -->
+        <div id="signals" class="tab-content active">
+            <h2>Fundamental Signals</h2>
+            <div class="control-panel">
+                <div class="control-group">
+                    <label>Signal Type:</label>
+                    <select id="signalType" onchange="updateSignal()">
+                        <option value="unitStep">Unit Step u(t)</option>
+                        <option value="impulse">Unit Impulse δ(t)</option>
+                        <option value="ramp">Ramp r(t)</option>
+                        <option value="sinusoid">Sinusoid</option>
+                        <option value="exponential">Exponential</option>
+                        <option value="dampedSinusoid">Damped Sinusoid</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label>Amplitude:</label>
+                    <input type="number" id="amplitude" value="1" step="0.1" onchange="updateSignal()">
+                </div>
+                <div class="control-group">
+                    <label>Frequency (ω):</label>
+                    <input type="number" id="frequency" value="1" step="0.1" onchange="updateSignal()">
+                </div>
+                <div class="control-group">
+                    <label>Phase (φ):</label>
+                    <input type="number" id="phase" value="0" step="0.1" onchange="updateSignal()">
+                </div>
+                <div class="control-group">
+                    <label>Time Shift:</label>
+                    <input type="number" id="timeShift" value="0" step="0.1" onchange="updateSignal()">
+                </div>
+                <div class="control-group">
+                    <label>Damping Factor (α):</label>
+                    <input type="number" id="damping" value="-0.1" step="0.01" onchange="updateSignal()">
+                </div>
+            </div>
+            <div class="plot-container">
+                <div id="signalPlot"></div>
+            </div>
+        </div>
+        
+        <!-- Signal Operations Tab -->
+        <div id="operations" class="tab-content">
+            <h2>Signal Operations</h2>
+            <div class="signal-builder">
+                <div>
+                    <h3>Signal A</h3>
+                    <div class="control-panel">
+                        <div class="control-group">
+                            <label>Type:</label>
+                            <select id="signalA_type" onchange="updateOperations()">
+                                <option value="sinusoid">Sinusoid</option>
+                                <option value="unitStep">Unit Step</option>
+                                <option value="exponential">Exponential</option>
+                                <option value="ramp">Ramp</option>
+                            </select>
+                        </div>
+                        <div class="control-group">
+                            <label>Amplitude:</label>
+                            <input type="number" id="signalA_amp" value="1" step="0.1" onchange="updateOperations()">
+                        </div>
+                        <div class="control-group">
+                            <label>Frequency:</label>
+                            <input type="number" id="signalA_freq" value="1" step="0.1" onchange="updateOperations()">
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <h3>Signal B</h3>
+                    <div class="control-panel">
+                        <div class="control-group">
+                            <label>Type:</label>
+                            <select id="signalB_type" onchange="updateOperations()">
+                                <option value="sinusoid">Sinusoid</option>
+                                <option value="unitStep">Unit Step</option>
+                                <option value="exponential">Exponential</option>
+                                <option value="ramp">Ramp</option>
+                            </select>
+                        </div>
+                        <div class="control-group">
+                            <label>Amplitude:</label>
+                            <input type="number" id="signalB_amp" value="0.5" step="0.1" onchange="updateOperations()">
+                        </div>
+                        <div class="control-group">
+                            <label>Frequency:</label>
+                            <input type="number" id="signalB_freq" value="2" step="0.1" onchange="updateOperations()">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="control-panel">
+                <div class="control-group">
+                    <label>Operation:</label>
+                    <select id="operation" onchange="updateOperations()">
+                        <option value="add">Addition (A + B)</option>
+                        <option value="subtract">Subtraction (A - B)</option>
+                        <option value="multiply">Multiplication (A × B)</option>
+                    </select>
+                </div>
+                <button onclick="updateOperations()">Update Plot</button>
+            </div>
+            <div class="plot-container">
+                <div id="operationsPlot"></div>
+            </div>
+        </div>
+        
+        <!-- Fourier Series Tab -->
+        <div id="fourier-series" class="tab-content">
+            <h2>Fourier Series Analysis</h2>
+            <div class="control-panel">
+                <div class="control-group">
+                    <label>Signal Type:</label>
+                    <select id="fs_signalType" onchange="updateFourierSeries()">
+                        <option value="squareWave">Square Wave</option>
+                        <option value="triangleWave">Triangle Wave</option>
+                        <option value="sawtoothWave">Sawtooth Wave</option>
+                        <option value="custom">Custom Periodic</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label>Fundamental Period (T):</label>
+                    <input type="number" id="fs_period" value="2" step="0.1" onchange="updateFourierSeries()">
+                </div>
+                <div class="control-group">
+                    <label>Number of Harmonics (n):</label>
+                    <input type="number" id="fs_harmonics" value="5" min="1" max="20" onchange="updateFourierSeries()">
+                </div>
+                <div class="control-group">
+                    <label>Representation:</label>
+                    <select id="fs_representation" onchange="updateFourierSeries()">
+                        <option value="trigonometric">Trigonometric</option>
+                        <option value="compact">Compact</option>
+                        <option value="exponential">Exponential</option>
+                    </select>
+                </div>
+                <button onclick="updateFourierSeries()">Analyze</button>
+            </div>
+            <div class="plot-container">
+                <div id="fourierSeriesPlot"></div>
+            </div>
+            <div class="coefficient-display">
+                <h3>Fourier Coefficients</h3>
+                <div id="fourierCoefficients"></div>
+            </div>
+        </div>
+        
+        <!-- Fourier Transform Tab -->
+        <div id="fourier-transform" class="tab-content">
+            <h2>Continuous-Time Fourier Transform</h2>
+            <div class="control-panel">
+                <div class="control-group">
+                    <label>Signal Type:</label>
+                    <select id="ft_signalType" onchange="updateFourierTransform()">
+                        <option value="rectangular">Rectangular Pulse</option>
+                        <option value="exponential">Exponential Decay</option>
+                        <option value="gaussian">Gaussian</option>
+                        <option value="sinc">Sinc Function</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label>Parameter:</label>
+                    <input type="number" id="ft_parameter" value="1" step="0.1" onchange="updateFourierTransform()">
+                </div>
+                <div class="control-group">
+                    <label>Representation:</label>
+                    <select id="ft_representation" onchange="updateFourierTransform()">
+                        <option value="magnitude">Magnitude</option>
+                        <option value="phase">Phase</option>
+                        <option value="real">Real Part</option>
+                        <option value="imaginary">Imaginary Part</option>
+                    </select>
+                </div>
+                <button onclick="updateFourierTransform()">Transform</button>
+            </div>
+            <div class="plot-container">
+                <div id="fourierTransformPlot"></div>
+            </div>
+        </div>
+        
+        <!-- Properties Tab -->
+        <div id="properties" class="tab-content">
+            <h2>Fourier Transform Properties</h2>
+            <div class="properties-grid">
+                <div class="property-card">
+                    <h4>Linearity</h4>
+                    <p>F{ax(t) + by(t)} = aX(ω) + bY(ω)</p>
+                    <div class="control-panel">
+                        <button onclick="demonstrateLinearity()">Demonstrate</button>
+                    </div>
+                </div>
+                <div class="property-card">
+                    <h4>Time Shifting</h4>
+                    <p>F{x(t-t₀)} = X(ω)e^(-jωt₀)</p>
+                    <div class="control-panel">
+                        <button onclick="demonstrateTimeShift()">Demonstrate</button>
+                    </div>
+                </div>
+                <div class="property-card">
+                    <h4>Frequency Shifting</h4>
+                    <p>F{x(t)e^(jω₀t)} = X(ω-ω₀)</p>
+                    <div class="control-panel">
+                        <button onclick="demonstrateFreqShift()">Demonstrate</button>
+                    </div>
+                </div>
+                <div class="property-card">
+                    <h4>Time Scaling</h4>
+                    <p>F{x(at)} = (1/|a|)X(ω/a)</p>
+                    <div class="control-panel">
+                        <button onclick="demonstrateTimeScaling()">Demonstrate</button>
+                    </div>
+                </div>
+            </div>
+            <div class="plot-container">
+                <div id="propertiesPlot"></div>
+            </div>
+        </div>
+        
+        <!-- Formulas Tab -->
+        <div id="formulas" class="tab-content">
+            <h2>Formula Reference</h2>
+            
+            <div class="formula-section">
+                <h3>Basic Signals</h3>
+                <div class="formula">Unit Step: u(t) = {1 for t ≥ 0, 0 for t < 0}</div>
+                <div class="formula">Unit Impulse: δ(t) = {∞ for t = 0, 0 for t ≠ 0}, ∫δ(t)dt = 1</div>
+                <div class="formula">Ramp: r(t) = t·u(t)</div>
+                <div class="formula">Sinusoid: x(t) = A cos(ωt + φ) = A cos(2πft + φ)</div>
+                <div class="formula">Complex Exponential: x(t) = Ae^(σ+jω)t = Ae^σt · e^jωt</div>
+            </div>
+            
+            <div class="formula-section">
+                <h3>Fourier Series (Periodic Signals)</h3>
+                <div class="formula">
+                    <strong>Trigonometric Form:</strong><br>
+                    x(t) = a₀ + Σ[aₙcos(nω₀t) + bₙsin(nω₀t)]<br>
+                    a₀ = (1/T)∫x(t)dt<br>
+                    aₙ = (2/T)∫x(t)cos(nω₀t)dt<br>
+                    bₙ = (2/T)∫x(t)sin(nω₀t)dt
+                </div>
+                <div class="formula">
+                    <strong>Compact Form:</strong><br>
+                    x(t) = c₀ + Σcₙcos(nω₀t + φₙ)<br>
+                    cₙ = √(aₙ² + bₙ²)<br>
+                    φₙ = -tan⁻¹(bₙ/aₙ)
+                </div>
+                <div class="formula">
+                    <strong>Exponential Form:</strong><br>
+                    x(t) = ΣDₙe^(jnω₀t)<br>
+                    Dₙ = (1/T)∫x(t)e^(-jnω₀t)dt<br>
+                    D₋ₙ = Dₙ* (for real signals)
+                </div>
+            </div>
+            
+            <div class="formula-section">
+                <h3>Fourier Transform (Aperiodic Signals)</h3>
+                <div class="formula">
+                    <strong>Forward Transform:</strong><br>
+                    X(ω) = ∫x(t)e^(-jωt)dt
+                </div>
+                <div class="formula">
+                    <strong>Inverse Transform:</strong><br>
+                    x(t) = (1/2π)∫X(ω)e^(jωt)dω
+                </div>
+                <div class="formula">
+                    <strong>Magnitude and Phase:</strong><br>
+                    |X(ω)| = √[Re²{X(ω)} + Im²{X(ω)}]<br>
+                    ∠X(ω) = tan⁻¹[Im{X(ω)}/Re{X(ω)}]
+                </div>
+            </div>
+            
+            <div class="formula-section">
+                <h3>Common Transform Pairs</h3>
+                <div class="formula">δ(t) ↔ 1</div>
+                <div class="formula">1 ↔ 2πδ(ω)</div>
+                <div class="formula">u(t) ↔ πδ(ω) + 1/(jω)</div>
+                <div class="formula">e^(-at)u(t) ↔ 1/(a + jω), Re{a} > 0</div>
+                <div class="formula">te^(-at)u(t) ↔ 1/(a + jω)², Re{a} > 0</div>
+                <div class="formula">cos(ω₀t) ↔ π[δ(ω-ω₀) + δ(ω+ω₀)]</div>
+                <div class="formula">sin(ω₀t) ↔ jπ[δ(ω+ω₀) - δ(ω-ω₀)]</div>
+                <div class="formula">rect(t/T) ↔ T·sinc(ωT/2π)</div>
+            </div>
+            
+            <div class="formula-section">
+                <h3>Properties of Fourier Transform</h3>
+                <div class="formula">Linearity: F{ax(t) + by(t)} = aX(ω) + bY(ω)</div>
+                <div class="formula">Time Shift: F{x(t-t₀)} = X(ω)e^(-jωt₀)</div>
+                <div class="formula">Frequency Shift: F{x(t)e^(jω₀t)} = X(ω-ω₀)</div>
+                <div class="formula">Time Scaling: F{x(at)} = (1/|a|)X(ω/a)</div>
+                <div class="formula">Differentiation: F{dx/dt} = jωX(ω)</div>
+                <div class="formula">Integration: F{∫x(τ)dτ} = X(ω)/(jω) + πX(0)δ(ω)</div>
+                <div class="formula">Convolution: F{x(t)*y(t)} = X(ω)Y(ω)</div>
+                <div class="formula">Multiplication: F{x(t)y(t)} = (1/2π)X(ω)*Y(ω)</div>
+                <div class="formula">Parseval's Theorem: ∫|x(t)|²dt = (1/2π)∫|X(ω)|²dω</div>
+            </div>
+        </div>
+        
+        <!-- Reconstruction Game Tab -->
+        <div id="reconstruction-game" class="tab-content">
+            <h2>Signal Reconstruction Game</h2>
+            <div class="control-panel">
+                <div class="control-group">
+                    <label>Level:</label>
+                    <span id="gameLevel">1</span>
+                </div>
+                <div class="control-group">
+                    <label>Operation:</label>
+                    <select id="gameOperation">
+                        <option value="add">Addition (+)</option>
+                        <option value="subtract">Subtraction (-)</option>
+                        <option value="multiply">Multiplication (×)</option>
+                        <option value="divide">Division (÷)</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label>Signal 1:</label>
+                    <select id="gameSignal1">
+                        <option value="unitStep">Unit Step</option>
+                        <option value="ramp">Ramp</option>
+                        <option value="exponential">Exponential</option>
+                        <option value="sinusoid">Sinusoid</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label>Signal 2:</label>
+                    <select id="gameSignal2">
+                        <option value="unitStep">Unit Step</option>
+                        <option value="ramp">Ramp</option>
+                        <option value="exponential">Exponential</option>
+                        <option value="sinusoid">Sinusoid</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label>Amplitude 1:</label>
+                    <input type="number" id="gameAmp1" value="1" step="0.1">
+                </div>
+                <div class="control-group">
+                    <label>Amplitude 2:</label>
+                    <input type="number" id="gameAmp2" value="1" step="0.1">
+                </div>
+                <button onclick="submitReconstruction()">Submit</button>
+                <button onclick="resetReconstruction()">Reset</button>
+            </div>
+            <div class="plot-container">
+                <div id="gameTargetPlot"></div>
+                <div id="gameUserPlot"></div>
+            </div>
+            <div id="gameFeedback" style="margin-top:20px;font-weight:bold;"></div>
+            <button id="gamePrevLevelBtn" style="display:none;margin-top:10px;" onclick="goToPreviousLevel()">Go Back to Previous Level</button>
+            <button id="gameResetLevelBtn" style="margin-top:10px;" onclick="resetReconstructionLevel()">Reset Level</button>
+        </div>
+        
+        <!-- Even/Odd & Harmonics Game Tab -->
+        <div id="evenodd-game" class="tab-content">
+            <h2>Even/Odd & Harmonics Game</h2>
+            <div class="control-panel">
+                <div class="control-group">
+                    <label>Level:</label>
+                    <span id="evenoddGameLevel">1</span>
+                </div>
+                <button onclick="resetEvenOddGameLevel()">Reset</button>
+            </div>
+            <div class="plot-container">
+                <div id="evenoddGamePlot"></div>
+            </div>
+            <div class="control-panel">
+                <div class="control-group">
+                    <label>Signal Type:</label>
+                    <select id="evenoddGuessType">
+                        <option value="even">Even</option>
+                        <option value="odd">Odd</option>
+                        <option value="neither">Neither</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label>Harmonics Present:</label>
+                    <select id="evenoddGuessHarmonics">
+                        <option value="even">Even Harmonics</option>
+                        <option value="odd">Odd Harmonics</option>
+                        <option value="both">Both</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label>Wave Symmetry:</label>
+                    <select id="evenoddGuessSymmetry">
+                        <option value="symmetric">Symmetric</option>
+                        <option value="anti-symmetric">Anti-symmetric</option>
+                        <option value="none">None</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label>Power/Energy:</label>
+                    <select id="evenoddGuessPower">
+                        <option value="power">Power Signal</option>
+                        <option value="energy">Energy Signal</option>
+                        <option value="neither">Neither</option>
+                    </select>
+                </div>
+                <button onclick="submitEvenOddGame()">Submit</button>
+                <button id="evenoddPrevLevelBtn" style="display:none;margin-top:10px;" onclick="goToPreviousEvenOddLevel()">Go Back to Previous Level</button>
+            </div>
+            <div id="evenoddGameFeedback" style="margin-top:20px;font-weight:bold;"></div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let currentSignalData = [];
+        let fourierCoefficients = [];
+        
+        // --- Signal Reconstruction Game ---
+        let gameLevel = 1;
+        let gameTargetSignal = [];
+        let gameTargetFormula = null;
+        let gameT = generateTimeArray(-5, 5, 500);
+
+        // Load level from localStorage if available
+        if (localStorage.getItem('reconstructionGameLevel')) {
+            gameLevel = parseInt(localStorage.getItem('reconstructionGameLevel')) || 1;
+        }
+
+        function randomBetween(a, b) {
+            return a + Math.random() * (b - a);
+        }
+
+        function randomInt(a, b) {
+            return Math.floor(a + Math.random() * (b - a + 1));
+        }
+
+        // Enhanced: ensure more variety and mixing of fundamental types
+        function generateRandomSignal(level) {
+            // Track recent types to avoid repetition
+            let recentTypes = [];
+            const maxRecent = 3; // How many recent types to remember
+
+            function makeFormula(depth) {
+                if (depth <= 1) {
+                    // Pick a type not recently used, if possible
+                    let types = ['unitStep', 'ramp', 'exponential', 'sinusoid'];
+                    // Remove recently used types if possible
+                    let available = types.filter(t => !recentTypes.includes(t));
+                    if (available.length === 0) available = types; // fallback
+                    const type = available[randomInt(0, available.length - 1)];
+                    recentTypes.push(type);
+                    if (recentTypes.length > maxRecent) recentTypes.shift();
+                    const amp = randomBetween(0.5, 2 + level * 0.05); // amplitude range grows
+                    return {op: 'single', type, amp};
+                } else {
+                    // Randomize operation and subtree order for more variety
+                    let op = pickOperation();
+                    // Randomly swap left/right to mix up the tree
+                    if (Math.random() < 0.5) {
+                        return {
+                            op,
+                            left: makeFormula(depth - 1),
+                            right: makeFormula(depth - 1)
+                        };
+                    } else {
+                        return {
+                            op,
+                            right: makeFormula(depth - 1),
+                            left: makeFormula(depth - 1)
+                        };
+                    }
+                }
+            }
+            // Depth increases with level
+            let depth = 1 + Math.floor(level / 10);
+            if (depth > 8) depth = 8 + Math.floor((level - 80) / 5); // after 80, increase depth more slowly
+            // Shuffle the types at the start of each new signal for more variety
+            // (This helps at the root level)
+            recentTypes = recentTypes.sort(() => Math.random() - 0.5);
+            return makeFormula(depth);
+        }
+
+        function pickOperation() {
+            const ops = ['add', 'subtract', 'multiply', 'divide'];
+            return ops[randomInt(0, ops.length - 1)];
+        }
+
+        function evalFormula(formula, t) {
+            if (formula.op === 'single') {
+                return generateSignal(formula.type, t, {amplitude: formula.amp, frequency: 1, phase: 0, damping: -0.5});
+            }
+            const left = evalFormula(formula.left, t);
+            const right = evalFormula(formula.right, t);
+            switch(formula.op) {
+                case 'add': return left.map((v, i) => v + right[i]);
+                case 'subtract': return left.map((v, i) => v - right[i]);
+                case 'multiply': return left.map((v, i) => v * right[i]);
+                case 'divide': return left.map((v, i) => right[i] !== 0 ? v / right[i] : 0);
+            }
+        }
+
+        function startReconstructionLevel() {
+            document.getElementById('gameLevel').textContent = gameLevel;
+            gameTargetFormula = generateRandomSignal(gameLevel);
+            gameTargetSignal = evalFormula(gameTargetFormula, gameT);
+            Plotly.newPlot('gameTargetPlot', [{x: gameT, y: gameTargetSignal, type: 'scatter', mode: 'lines', line: {color: '#e53e3e'}, name: 'Target Signal'}], {title: 'Target Signal', xaxis: {title: 't'}, yaxis: {title: 'Amplitude'}});
+            Plotly.newPlot('gameUserPlot', [{x: gameT, y: new Array(gameT.length).fill(0), type: 'scatter', mode: 'lines', line: {color: '#667eea'}, name: 'Your Signal'}], {title: 'Your Signal', xaxis: {title: 't'}, yaxis: {title: 'Amplitude'}});
+            document.getElementById('gameFeedback').textContent = '';
+            document.getElementById('gamePrevLevelBtn').style.display = gameLevel > 1 ? 'inline-block' : 'none';
+            localStorage.setItem('reconstructionGameLevel', gameLevel);
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            updateSignal();
+            updateOperations();
+            updateFourierSeries();
+            updateFourierTransform();
+            startReconstructionLevel();
+        });
+        
+        // Tab switching functionality
+        function showTab(tabName) {
+            // Hide all tab contents
+            const contents = document.querySelectorAll('.tab-content');
+            contents.forEach(content => content.classList.remove('active'));
+            
+            // Remove active class from all buttons
+            const buttons = document.querySelectorAll('.tab-button');
+            buttons.forEach(button => button.classList.remove('active'));
+            
+            // Show selected tab and activate button
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+        }
+        
+        // Generate time array
+        function generateTimeArray(start = -10, end = 10, samples = 1000) {
+            const dt = (end - start) / samples;
+            return Array.from({length: samples}, (_, i) => start + i * dt);
+        }
+        
+        // Signal generation functions
+        function generateSignal(type, t, params = {}) {
+            const {amplitude = 1, frequency = 1, phase = 0, timeShift = 0, damping = 0} = params;
+            const adjustedT = t.map(time => time - timeShift);
+            
+            switch(type) {
+                case 'unitStep':
+                    return adjustedT.map(time => amplitude * (time >= 0 ? 1 : 0));
+                case 'impulse':
+                    return adjustedT.map(time => amplitude * (Math.abs(time) < 0.01 ? 50 : 0));
+                case 'ramp':
+                    return adjustedT.map(time => amplitude * Math.max(0, time));
+                case 'sinusoid':
+                    return adjustedT.map(time => amplitude * Math.cos(frequency * time + phase));
+                case 'exponential':
+                    return adjustedT.map(time => amplitude * Math.exp(damping * time) * (time >= 0 ? 1 : 0));
+                case 'dampedSinusoid':
+                    return adjustedT.map(time => amplitude * Math.exp(damping * time) * Math.cos(frequency * time + phase) * (time >= 0 ? 1 : 0));
+                default:
+                    return new Array(t.length).fill(0);
+            }
+        }
+        
+        // Update basic signals plot
+        function updateSignal() {
+            const signalType = document.getElementById('signalType').value;
+            const amplitude = parseFloat(document.getElementById('amplitude').value);
+            const frequency = parseFloat(document.getElementById('frequency').value);
+            const phase = parseFloat(document.getElementById('phase').value);
+            const timeShift = parseFloat(document.getElementById('timeShift').value);
+            const damping = parseFloat(document.getElementById('damping').value);
+            
+            const t = generateTimeArray(-5, 5, 500);
+            const signal = generateSignal(signalType, t, {amplitude, frequency, phase, timeShift, damping});
+            
+            currentSignalData = {t, signal};
+            
+            const trace = {
+                x: t,
+                y: signal,
+                type: 'scatter',
+                mode: 'lines',
+                line: {color: '#667eea', width: 3},
+                name: getSignalName(signalType)
+            };
+            
+            const layout = {
+                title: `${getSignalName(signalType)} - Interactive Visualization`,
+                xaxis: {title: 'Time (t)', gridcolor: '#f0f0f0'},
+                yaxis: {title: 'Amplitude', gridcolor: '#f0f0f0'},
+                plot_bgcolor: '#fafafa',
+                paper_bgcolor: 'white',
+                font: {family: 'Arial, sans-serif', size: 12}
+            };
+            
+            Plotly.newPlot('signalPlot', [trace], layout, {responsive: true});
+        }
+        
+        function getSignalName(type) {
+            const names = {
+                'unitStep': 'Unit Step u(t)',
+                'impulse': 'Unit Impulse δ(t)',
+                'ramp': 'Ramp r(t)',
+                'sinusoid': 'Sinusoid',
+                'exponential': 'Exponential',
+                'dampedSinusoid': 'Damped Sinusoid'
+            };
+            return names[type] || type;
+        }
+        
+        // Update signal operations
+        function updateOperations() {
+            const typeA = document.getElementById('signalA_type').value;
+            const ampA = parseFloat(document.getElementById('signalA_amp').value);
+            const freqA = parseFloat(document.getElementById('signalA_freq').value);
+            
+            const typeB = document.getElementById('signalB_type').value;
+            const ampB = parseFloat(document.getElementById('signalB_amp').value);
+            const freqB = parseFloat(document.getElementById('signalB_freq').value);
+            
+            const operation = document.getElementById('operation').value;
+            
+            const t = generateTimeArray(-5, 5, 500);
+            const signalA = generateSignal(typeA, t, {amplitude: ampA, frequency: freqA});
+            const signalB = generateSignal(typeB, t, {amplitude: ampB, frequency: freqB});
+            
+            let result;
+            let operationName;
+            switch(operation) {
+                case 'add':
+                    result = signalA.map((a, i) => a + signalB[i]);
+                    operationName = 'A + B';
+                    break;
+                case 'subtract':
+                    result = signalA.map((a, i) => a - signalB[i]);
+                    operationName = 'A - B';
+                    break;
+                case 'multiply':
+                    result = signalA.map((a, i) => a * signalB[i]);
+                    operationName = 'A × B';
+                    break;
+                default:
+                    result = signalA;
+                    operationName = 'A';
+            }
+            
+            const traces = [
+                {
+                    x: t, y: signalA,
+                    type: 'scatter', mode: 'lines',
+                    line: {color: '#667eea', width: 2},
+                    name: 'Signal A'
+                },
+                {
+                    x: t, y: signalB,
+                    type: 'scatter', mode: 'lines',
+                    line: {color: '#764ba2', width: 2},
+                    name: 'Signal B'
+                },
+                {
+                    x: t, y: result,
+                    type: 'scatter', mode: 'lines',
+                    line: {color: '#e53e3e', width: 3},
+                    name: `Result (${operationName})`
+                }
+            ];
+            
+            const layout = {
+                title: `Signal Operations: ${operationName}`,
+                xaxis: {title: 'Time (t)', gridcolor: '#f0f0f0'},
+                yaxis: {title: 'Amplitude', gridcolor: '#f0f0f0'},
+                plot_bgcolor: '#fafafa',
+                paper_bgcolor: 'white',
+                legend: {x: 0, y: 1}
+            };
+            
+            Plotly.newPlot('operationsPlot', traces, layout, {responsive: true});
+        }
+        
+        // Fourier Series Analysis
+        function updateFourierSeries() {
+            const signalType = document.getElementById('fs_signalType').value;
+            const period = parseFloat(document.getElementById('fs_period').value);
+            const harmonics = parseInt(document.getElementById('fs_harmonics').value);
+            const representation = document.getElementById('fs_representation').value;
+            
+            const t = generateTimeArray(-2*period, 2*period, 1000);
+            const originalSignal = generatePeriodicSignal(signalType, t, period);
+            
+            // Calculate Fourier coefficients
+            const coefficients = calculateFourierCoefficients(signalType, period, harmonics);
+            
+            // Reconstruct signal using Fourier series
+            const reconstructed = reconstructFromFourier(t, coefficients, period, harmonics, representation);
+            
+            // Display coefficients
+            displayFourierCoefficients(coefficients, representation);
+            
+            const traces = [
+                {
+                    x: t, y: originalSignal,
+                    type: 'scatter', mode: 'lines',
+                    line: {color: '#667eea', width: 3},
+                    name: 'Original Signal'
+                },
+                {
+                    x: t, y: reconstructed,
+                    type: 'scatter', mode: 'lines',
+                    line: {color: '#e53e3e', width: 2, dash: 'dash'},
+                    name: `Fourier Series (n=${harmonics})`
+                }
+            ];
+            
+            const layout = {
+                title: `Fourier Series Analysis - ${signalType.charAt(0).toUpperCase() + signalType.slice(1)}`,
+                xaxis: {title: 'Time (t)', gridcolor: '#f0f0f0'},
+                yaxis: {title: 'Amplitude', gridcolor: '#f0f0f0'},
+                plot_bgcolor: '#fafafa',
+                paper_bgcolor: 'white',
+                legend: {x: 0, y: 1}
+            };
+            
+            Plotly.newPlot('fourierSeriesPlot', traces, layout, {responsive: true});
+        }
+        
+        function generatePeriodicSignal(type, t, period) {
+            const omega0 = 2 * Math.PI / period;
+            
+            switch(type) {
+                case 'squareWave':
+                    return t.map(time => {
+                        const phase = (time % period + period) % period;
+                        return phase < period/2 ? 1 : -1;
+                    });
+                case 'triangleWave':
+                    return t.map(time => {
+                        const phase = (time % period + period) % period;
+                        if (phase < period/2) {
+                            return 4 * phase / period - 1;
+                        } else {
+                            return 3 - 4 * phase / period;
+                        }
+                    });
+                case 'sawtoothWave':
+                    return t.map(time => {
+                        const phase = (time % period + period) % period;
+                        return 2 * phase / period - 1;
+                    });
+                default:
+                    return t.map(time => Math.cos(omega0 * time));
+            }
+        }
+        
+        // Complex number helper functions
+        function createComplex(real, imag) {
+            return {re: real, im: imag};
+        }
+        
+        function complexMultiply(a, b) {
+            return {
+                re: a.re * b.re - a.im * b.im,
+                im: a.re * b.im + a.im * b.re
+            };
+        }
+        
+        function complexDivide(a, b) {
+            const denominator = b.re * b.re + b.im * b.im;
+            return {
+                re: (a.re * b.re + a.im * b.im) / denominator,
+                im: (a.im * b.re - a.re * b.im) / denominator
+            };
+        }
+        
+        function complexExp(z) {
+            const expReal = Math.exp(z.re);
+            return {
+                re: expReal * Math.cos(z.im),
+                im: expReal * Math.sin(z.im)
+            };
+        }
+        
+        function calculateFourierCoefficients(signalType, period, maxHarmonics) {
+            const coefficients = {a0: 0, an: [], bn: [], cn: [], phin: [], Dn: []};
+            
+            // Analytical coefficients for common waveforms
+            switch(signalType) {
+                case 'squareWave':
+                    coefficients.a0 = 0;
+                    for (let n = 1; n <= maxHarmonics; n++) {
+                        coefficients.an[n-1] = 0;
+                        coefficients.bn[n-1] = n % 2 === 1 ? 4 / (Math.PI * n) : 0;
+                        coefficients.cn[n-1] = Math.abs(coefficients.bn[n-1]);
+                        coefficients.phin[n-1] = coefficients.bn[n-1] > 0 ? -Math.PI/2 : Math.PI/2;
+                        // Dn = bn/(2j) = -j*bn/2 for sine terms
+                        coefficients.Dn[n-1] = createComplex(0, -coefficients.bn[n-1]/2);
+                    }
+                    break;
+                    
+                case 'triangleWave':
+                    coefficients.a0 = 0;
+                    for (let n = 1; n <= maxHarmonics; n++) {
+                        coefficients.an[n-1] = n % 2 === 1 ? 8 / (Math.PI * Math.PI * n * n) * Math.pow(-1, (n-1)/2) : 0;
+                        coefficients.bn[n-1] = 0;
+                        coefficients.cn[n-1] = Math.abs(coefficients.an[n-1]);
+                        coefficients.phin[n-1] = coefficients.an[n-1] >= 0 ? 0 : Math.PI;
+                        coefficients.Dn[n-1] = createComplex(coefficients.an[n-1] / 2, 0);
+                    }
+                    break;
+                    
+                case 'sawtoothWave':
+                    coefficients.a0 = 0;
+                    for (let n = 1; n <= maxHarmonics; n++) {
+                        coefficients.an[n-1] = 0;
+                        coefficients.bn[n-1] = 2 / (Math.PI * n) * Math.pow(-1, n+1);
+                        coefficients.cn[n-1] = Math.abs(coefficients.bn[n-1]);
+                        coefficients.phin[n-1] = coefficients.bn[n-1] > 0 ? -Math.PI/2 : Math.PI/2;
+                        coefficients.Dn[n-1] = createComplex(0, -coefficients.bn[n-1]/2);
+                    }
+                    break;
+            }
+            
+            return coefficients;
+        }
+        
+        function reconstructFromFourier(t, coefficients, period, maxHarmonics, representation) {
+            const omega0 = 2 * Math.PI / period;
+            
+            return t.map(time => {
+                let value = coefficients.a0;
+                
+                for (let n = 1; n <= maxHarmonics; n++) {
+                    const idx = n - 1;
+                    switch(representation) {
+                        case 'trigonometric':
+                            value += coefficients.an[idx] * Math.cos(n * omega0 * time) + 
+                                    coefficients.bn[idx] * Math.sin(n * omega0 * time);
+                            break;
+                        case 'compact':
+                            value += coefficients.cn[idx] * Math.cos(n * omega0 * time + coefficients.phin[idx]);
+                            break;
+                        case 'exponential':
+                            // For exponential form: x(t) = sum(Dn * e^(jnω₀t))
+                            // For real signals, we use Dn and D(-n) = Dn*
+                            const expTerm = complexExp(createComplex(0, n * omega0 * time));
+                            const dnTerm = complexMultiply(coefficients.Dn[idx], expTerm);
+                            const dnNegTerm = complexMultiply(createComplex(coefficients.Dn[idx].re, -coefficients.Dn[idx].im), 
+                                                            complexExp(createComplex(0, -n * omega0 * time)));
+                            value += dnTerm.re + dnNegTerm.re; // Only real part for real signals
+                            break;
+                    }
+                }
+                
+                return value;
+            });
+        }
+        
+        function displayFourierCoefficients(coefficients, representation) {
+            const container = document.getElementById('fourierCoefficients');
+            container.innerHTML = '';
+            
+            // DC component
+            const dcElement = document.createElement('div');
+            dcElement.className = 'coefficient-item';
+            dcElement.innerHTML = `<strong>DC Component:</strong> a₀ = ${coefficients.a0.toFixed(4)}`;
+            container.appendChild(dcElement);
+            
+            // AC components
+            for (let n = 0; n < coefficients.an.length; n++) {
+                const element = document.createElement('div');
+                element.className = 'coefficient-item';
+                
+                switch(representation) {
+                    case 'trigonometric':
+                        element.innerHTML = `<strong>n=${n+1}:</strong> a${n+1} = ${coefficients.an[n].toFixed(4)}, b${n+1} = ${coefficients.bn[n].toFixed(4)}`;
+                        break;
+                    case 'compact':
+                        element.innerHTML = `<strong>n=${n+1}:</strong> c${n+1} = ${coefficients.cn[n].toFixed(4)}, φ${n+1} = ${(coefficients.phin[n] * 180 / Math.PI).toFixed(2)}°`;
+                        break;
+                    case 'exponential':
+                        const dnReal = coefficients.Dn[n].re;
+                        const dnImag = coefficients.Dn[n].im;
+                        const magnitude = Math.sqrt(dnReal * dnReal + dnImag * dnImag);
+                        const phase = Math.atan2(dnImag, dnReal) * 180 / Math.PI;
+                        element.innerHTML = `<strong>n=${n}:</strong> D${n} = ${dnReal.toFixed(4)} ${dnImag >= 0 ? '+' : ''}${dnImag.toFixed(4)}j (|D${n}| = ${magnitude.toFixed(4)}, ∠D${n} = ${phase.toFixed(2)}°)`;
+                        break;
+                }
+                
+                container.appendChild(element);
+            }
+        }
+        
+        // Fourier Transform Analysis
+        function updateFourierTransform() {
+            const signalType = document.getElementById('ft_signalType').value;
+            const parameter = parseFloat(document.getElementById('ft_parameter').value);
+            const representation = document.getElementById('ft_representation').value;
+            
+            const t = generateTimeArray(-10, 10, 500);
+            const signal = generateAperiodicSignal(signalType, t, parameter);
+            
+            // Generate frequency array
+            const omega = generateTimeArray(-10, 10, 500);
+            const transform = calculateAnalyticalFT(signalType, omega, parameter);
+            
+            let transformData;
+            let yLabel;
+            
+            switch(representation) {
+                case 'magnitude':
+                    transformData = transform.map(val => Math.sqrt(val.re * val.re + val.im * val.im));
+                    yLabel = '|X(ω)|';
+                    break;
+                case 'phase':
+                    transformData = transform.map(val => Math.atan2(val.im, val.re) * 180 / Math.PI);
+                    yLabel = '∠X(ω) (degrees)';
+                    break;
+                case 'real':
+                    transformData = transform.map(val => val.re);
+                    yLabel = 'Re{X(ω)}';
+                    break;
+                case 'imaginary':
+                    transformData = transform.map(val => val.im);
+                    yLabel = 'Im{X(ω)}';
+                    break;
+            }
+            
+            const traces = [
+                {
+                    x: t, y: signal,
+                    type: 'scatter', mode: 'lines',
+                    line: {color: '#667eea', width: 3},
+                    name: 'Time Domain Signal',
+                    xaxis: 'x', yaxis: 'y'
+                },
+                {
+                    x: omega, y: transformData,
+                    type: 'scatter', mode: 'lines',
+                    line: {color: '#e53e3e', width: 3},
+                    name: 'Frequency Domain',
+                    xaxis: 'x2', yaxis: 'y2'
+                }
+            ];
+            
+            const layout = {
+                title: `Fourier Transform - ${signalType.charAt(0).toUpperCase() + signalType.slice(1)}`,
+                grid: {rows: 2, columns: 1, pattern: 'independent'},
+                xaxis: {title: 'Time (t)', domain: [0, 1], anchor: 'y'},
+                yaxis: {title: 'x(t)', domain: [0.55, 1], anchor: 'x'},
+                xaxis2: {title: 'Frequency (ω)', domain: [0, 1], anchor: 'y2'},
+                yaxis2: {title: yLabel, domain: [0, 0.45], anchor: 'x2'},
+                plot_bgcolor: '#fafafa',
+                paper_bgcolor: 'white'
+            };
+            
+            Plotly.newPlot('fourierTransformPlot', traces, layout, {responsive: true});
+        }
+        
+        function generateAperiodicSignal(type, t, parameter) {
+            switch(type) {
+                case 'rectangular':
+                    return t.map(time => Math.abs(time) <= parameter ? 1 : 0);
+                case 'exponential':
+                    return t.map(time => time >= 0 ? Math.exp(-parameter * time) : 0);
+                case 'gaussian':
+                    return t.map(time => Math.exp(-parameter * time * time));
+                case 'sinc':
+                    return t.map(time => time === 0 ? 1 : Math.sin(parameter * time) / (parameter * time));
+                default:
+                    return new Array(t.length).fill(0);
+            }
+        }
+        
+        function calculateAnalyticalFT(signalType, omega, parameter) {
+            switch(signalType) {
+                case 'rectangular':
+                    return omega.map(w => ({
+                        re: w === 0 ? 2 * parameter : 2 * Math.sin(w * parameter) / w,
+                        im: 0
+                    }));
+                case 'exponential':
+                    return omega.map(w => ({
+                        re: parameter / (parameter * parameter + w * w),
+                        im: -w / (parameter * parameter + w * w)
+                    }));
+                case 'gaussian':
+                    return omega.map(w => ({
+                        re: Math.sqrt(Math.PI / parameter) * Math.exp(-w * w / (4 * parameter)),
+                        im: 0
+                    }));
+                case 'sinc':
+                    return omega.map(w => ({
+                        re: Math.abs(w) <= parameter ? Math.PI / parameter : 0,
+                        im: 0
+                    }));
+                default:
+                    return omega.map(w => ({re: 0, im: 0}));
+            }
+        }
+        
+        // Property demonstrations
+        function demonstrateLinearity() {
+            const t = generateTimeArray(-5, 5, 500);
+            const x1 = t.map(time => Math.exp(-time) * (time >= 0 ? 1 : 0));
+            const x2 = t.map(time => Math.cos(2 * time));
+            const combined = x1.map((val, i) => 0.5 * val + 0.3 * x2[i]);
+            
+            const traces = [
+                {x: t, y: x1, name: '0.5×e^(-t)u(t)', line: {color: '#667eea'}},
+                {x: t, y: x2, name: '0.3×cos(2t)', line: {color: '#764ba2'}},
+                {x: t, y: combined, name: 'Combined Signal', line: {color: '#e53e3e', width: 3}}
+            ];
+            
+            const layout = {
+                title: 'Linearity Property Demonstration',
+                xaxis: {title: 'Time (t)'},
+                yaxis: {title: 'Amplitude'},
+                plot_bgcolor: '#fafafa'
+            };
+            
+            Plotly.newPlot('propertiesPlot', traces, layout, {responsive: true});
+        }
+        
+        function demonstrateTimeShift() {
+            const t = generateTimeArray(-5, 5, 500);
+            const original = t.map(time => Math.exp(-time) * (time >= 0 ? 1 : 0));
+            const shifted = t.map(time => Math.exp(-(time-2)) * ((time-2) >= 0 ? 1 : 0));
+            
+            const traces = [
+                {x: t, y: original, name: 'e^(-t)u(t)', line: {color: '#667eea'}},
+                {x: t, y: shifted, name: 'e^(-(t-2))u(t-2)', line: {color: '#e53e3e'}}
+            ];
+            
+            const layout = {
+                title: 'Time Shifting Property: x(t-t₀)',
+                xaxis: {title: 'Time (t)'},
+                yaxis: {title: 'Amplitude'},
+                plot_bgcolor: '#fafafa'
+            };
+            
+            Plotly.newPlot('propertiesPlot', traces, layout, {responsive: true});
+        }
+        
+        function demonstrateFreqShift() {
+            const t = generateTimeArray(-2, 2, 500);
+            const original = t.map(time => Math.abs(time) <= 1 ? 1 : 0);
+            const modulated = t.map(time => (Math.abs(time) <= 1 ? 1 : 0) * Math.cos(3 * time));
+            
+            const traces = [
+                {x: t, y: original, name: 'rect(t)', line: {color: '#667eea'}},
+                {x: t, y: modulated, name: 'rect(t)cos(3t)', line: {color: '#e53e3e'}}
+            ];
+            
+            const layout = {
+                title: 'Frequency Shifting Property: x(t)e^(jω₀t)',
+                xaxis: {title: 'Time (t)'},
+                yaxis: {title: 'Amplitude'},
+                plot_bgcolor: '#fafafa'
+            };
+            
+            Plotly.newPlot('propertiesPlot', traces, layout, {responsive: true});
+        }
+        
+        function demonstrateTimeScaling() {
+            const t = generateTimeArray(-5, 5, 500);
+            const original = t.map(time => Math.exp(-Math.abs(time)));
+            const scaled = t.map(time => Math.exp(-Math.abs(2*time))); // x(2t)
+            
+            const traces = [
+                {x: t, y: original, name: 'e^(-|t|)', line: {color: '#667eea'}},
+                {x: t, y: scaled, name: 'e^(-|2t|) = x(2t)', line: {color: '#e53e3e'}}
+            ];
+            
+            const layout = {
+                title: 'Time Scaling Property: x(at)',
+                xaxis: {title: 'Time (t)'},
+                yaxis: {title: 'Amplitude'},
+                plot_bgcolor: '#fafafa'
+            };
+            
+            Plotly.newPlot('propertiesPlot', traces, layout, {responsive: true});
+        }
+
+        function getUserSignal() {
+            const op = document.getElementById('gameOperation').value;
+            const type1 = document.getElementById('gameSignal1').value;
+            const type2 = document.getElementById('gameSignal2').value;
+            const amp1 = parseFloat(document.getElementById('gameAmp1').value);
+            const amp2 = parseFloat(document.getElementById('gameAmp2').value);
+            const sig1 = generateSignal(type1, gameT, {amplitude: amp1, frequency: 1, phase: 0, damping: -0.5});
+            const sig2 = generateSignal(type2, gameT, {amplitude: amp2, frequency: 1, phase: 0, damping: -0.5});
+            switch(op) {
+                case 'add': return sig1.map((v, i) => v + sig2[i]);
+                case 'subtract': return sig1.map((v, i) => v - sig2[i]);
+                case 'multiply': return sig1.map((v, i) => v * sig2[i]);
+                case 'divide': return sig1.map((v, i) => sig2[i] !== 0 ? v / sig2[i] : 0);
+            }
+        }
+
+        function submitReconstruction() {
+            const userSignal = getUserSignal();
+            Plotly.newPlot('gameUserPlot', [{x: gameT, y: userSignal, type: 'scatter', mode: 'lines', line: {color: '#667eea'}, name: 'Your Signal'}], {title: 'Your Signal', xaxis: {title: 't'}, yaxis: {title: 'Amplitude'}});
+            // Compare userSignal and gameTargetSignal
+            let match = true;
+            for (let i = 0; i < gameT.length; i++) {
+                if (Math.abs(userSignal[i] - gameTargetSignal[i]) > 0.1) { match = false; break; }
+            }
+            if (match) {
+                document.getElementById('gameFeedback').textContent = 'You are Correct! Level up!';
+                document.getElementById('gamePrevLevelBtn').style.display = gameLevel > 1 ? 'inline-block' : 'none';
+                gameLevel = gameLevel + 1;
+                localStorage.setItem('reconstructionGameLevel', gameLevel);
+                setTimeout(() => {
+                    startReconstructionLevel();
+                    document.getElementById('gamePrevLevelBtn').style.display = gameLevel > 1 ? 'inline-block' : 'none';
+                }, 1200);
+            } else {
+                document.getElementById('gameFeedback').textContent = 'Not quite! Try again.';
+                document.getElementById('gamePrevLevelBtn').style.display = gameLevel > 1 ? 'inline-block' : 'none';
+            }
+        }
+
+        function goToPreviousLevel() {
+            if (gameLevel > 1) {
+                gameLevel--;
+                localStorage.setItem('reconstructionGameLevel', gameLevel);
+                startReconstructionLevel();
+                document.getElementById('gamePrevLevelBtn').style.display = gameLevel > 1 ? 'inline-block' : 'none';
+            }
+        }
+
+        function resetReconstructionLevel() {
+            gameLevel = 1;
+            localStorage.setItem('reconstructionGameLevel', gameLevel);
+            startReconstructionLevel();
+        }
+        
+        // --- Even/Odd & Harmonics Game ---
+        let evenoddGameLevel = 1;
+        let evenoddGameSignal = [];
+        let evenoddGameT = generateTimeArray(-5, 5, 500);
+        let evenoddGameAnswer = {};
+        let evenoddRecentTypes = [];
+        const evenoddMaxRecent = 3;
+
+        if (localStorage.getItem('evenoddGameLevel')) {
+            evenoddGameLevel = parseInt(localStorage.getItem('evenoddGameLevel')) || 1;
+        }
+
+        function randomEvenOddType() {
+            let types = ['even', 'odd', 'neither'];
+            let available = types.filter(t => !evenoddRecentTypes.includes(t));
+            if (available.length === 0) available = types;
+            const type = available[randomInt(0, available.length - 1)];
+            evenoddRecentTypes.push(type);
+            if (evenoddRecentTypes.length > evenoddMaxRecent) evenoddRecentTypes.shift();
+            return type;
+        }
+
+        function generateEvenOddSignal(level) {
+            // Compose a signal with a known even/odd/neither property
+            const t = evenoddGameT;
+            const type = randomEvenOddType();
+            let y = new Array(t.length).fill(0);
+            let harmonics = 'both';
+            let symmetry = 'none';
+            let powerType = 'energy';
+            let desc = '';
+            if (type === 'even') {
+                // Sum of cosines (even), e.g. cos(wt), cos(2wt)
+                let nTerms = 1 + Math.floor(level/5);
+                for (let n = 1; n <= nTerms; n++) {
+                    let amp = randomBetween(0.5, 2);
+                    let freq = n * randomBetween(0.8, 1.2);
+                    y = y.map((v, i) => v + amp * Math.cos(freq * t[i]));
+                }
+                harmonics = 'even'; // always even harmonics for even signals
+                symmetry = 'symmetric';
+                powerType = 'power';
+                desc = 'This is a sum of cosines (even function). Only cosine (even) harmonics are present in the Fourier series.';
+            } else if (type === 'odd') {
+                // Sum of sines (odd), e.g. sin(wt), sin(3wt)
+                let nTerms = 1 + Math.floor(level/5);
+                for (let n = 1; n <= nTerms; n++) {
+                    let amp = randomBetween(0.5, 2);
+                    let freq = n * randomBetween(0.8, 1.2);
+                    y = y.map((v, i) => v + amp * Math.sin(freq * t[i]));
+                }
+                harmonics = 'odd'; // always odd harmonics for odd signals
+                symmetry = 'anti-symmetric';
+                powerType = 'power';
+                desc = 'This is a sum of sines (odd function). Only sine (odd) harmonics are present in the Fourier series.';
+            } else {
+                // Mix of sine and cosine, or add ramp/unit step
+                let nTerms = 1 + Math.floor(level/5);
+                for (let n = 1; n <= nTerms; n++) {
+                    let amp = randomBetween(0.5, 2);
+                    let freq = n * randomBetween(0.8, 1.2);
+                    if (Math.random() < 0.5) {
+                        y = y.map((v, i) => v + amp * Math.sin(freq * t[i]));
+                    } else {
+                        y = y.map((v, i) => v + amp * Math.cos(freq * t[i]));
+                    }
+                }
+                // Add a ramp or step for more 'neither' flavor
+                if (Math.random() < 0.5) {
+                    y = y.map((v, i) => v + randomBetween(0.2, 1) * Math.max(0, t[i]));
+                } else {
+                    y = y.map((v, i) => v + randomBetween(0.2, 1) * (t[i] >= 0 ? 1 : 0));
+                }
+                harmonics = 'both';
+                symmetry = 'none';
+                powerType = 'energy';
+                desc = 'This is a mix of sine, cosine, and ramp/step (neither even nor odd). Both sine and cosine harmonics are present.';
+            }
+            // Power/Energy: If signal is periodic and nonzero mean, treat as power; else energy
+            evenoddGameAnswer = {
+                type,
+                harmonics,
+                symmetry,
+                powerType,
+                desc
+            };
+            return y;
+        }
+
+        function startEvenOddGameLevel() {
+            document.getElementById('evenoddGameLevel').textContent = evenoddGameLevel;
+            evenoddGameSignal = generateEvenOddSignal(evenoddGameLevel);
+            Plotly.newPlot('evenoddGamePlot', [{x: evenoddGameT, y: evenoddGameSignal, type: 'scatter', mode: 'lines', line: {color: '#e53e3e'}, name: 'Signal'}], {title: 'Guess the Signal Properties', xaxis: {title: 't'}, yaxis: {title: 'Amplitude'}});
+            document.getElementById('evenoddGameFeedback').textContent = '';
+            document.getElementById('evenoddPrevLevelBtn').style.display = evenoddGameLevel > 1 ? 'inline-block' : 'none';
+            localStorage.setItem('evenoddGameLevel', evenoddGameLevel);
+        }
+
+        function submitEvenOddGame() {
+            const guessType = document.getElementById('evenoddGuessType').value;
+            const guessHarmonics = document.getElementById('evenoddGuessHarmonics').value;
+            const guessSymmetry = document.getElementById('evenoddGuessSymmetry').value;
+            const guessPower = document.getElementById('evenoddGuessPower').value;
+            let correct = 0;
+            let total = 4;
+            let feedback = '';
+            if (guessType === evenoddGameAnswer.type) correct++; else feedback += `Type: Incorrect (Correct: ${evenoddGameAnswer.type})\n`;
+            if (guessHarmonics === evenoddGameAnswer.harmonics) correct++; else feedback += `Harmonics: Incorrect (Correct: ${evenoddGameAnswer.harmonics})\n`;
+            if (guessSymmetry === evenoddGameAnswer.symmetry) correct++; else feedback += `Symmetry: Incorrect (Correct: ${evenoddGameAnswer.symmetry})\n`;
+            if (guessPower === evenoddGameAnswer.powerType) correct++; else feedback += `Power/Energy: Incorrect (Correct: ${evenoddGameAnswer.powerType})\n`;
+            if (correct === total) {
+                document.getElementById('evenoddGameFeedback').textContent = 'Correct! Level up!\n' + evenoddGameAnswer.desc;
+                evenoddGameLevel++;
+                localStorage.setItem('evenoddGameLevel', evenoddGameLevel);
+                setTimeout(() => {
+                    startEvenOddGameLevel();
+                }, 1200);
+            } else {
+                document.getElementById('evenoddGameFeedback').textContent = feedback + evenoddGameAnswer.desc;
+            }
+            document.getElementById('evenoddPrevLevelBtn').style.display = evenoddGameLevel > 1 ? 'inline-block' : 'none';
+        }
+
+        function goToPreviousEvenOddLevel() {
+            if (evenoddGameLevel > 1) {
+                evenoddGameLevel--;
+                localStorage.setItem('evenoddGameLevel', evenoddGameLevel);
+                startEvenOddGameLevel();
+                document.getElementById('evenoddPrevLevelBtn').style.display = evenoddGameLevel > 1 ? 'inline-block' : 'none';
+            }
+        }
+
+        function resetEvenOddGameLevel() {
+            evenoddGameLevel = 1;
+            localStorage.setItem('evenoddGameLevel', evenoddGameLevel);
+            startEvenOddGameLevel();
+        }
+    </script>
+</body>
+</html>
